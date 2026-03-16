@@ -1,0 +1,38 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python cache / build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local IDE / OS files
+.vscode/
+.idea/
+.agents/
+.DS_Store
+Thumbs.db
+
+# Runtime / generated project data
+uploads/
+temp/
+
+# Logs
+*.log

@@ -1,0 +1,6 @@
+[theme]
+base = "light"
+
+[server]
+maxUploadSize = 2048
+maxMessageSize = 2048
