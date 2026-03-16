@@ -1,11 +1,12 @@
 """
 首頁 Dashboard：系統狀態一覽
 """
+import os
 import re
 
 import requests
 import streamlit as st
-from utils import inject_css, api_get, get_api_url
+from utils import inject_css, api_get, get_api_url, require_admin_auth
 
 st.set_page_config(
     page_title="ElenB Admin",
@@ -15,6 +16,10 @@ st.set_page_config(
 )
 
 inject_css()
+require_admin_auth()
+
+telegram_bot_username = os.getenv("TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
+telegram_bot_url = f"https://t.me/{telegram_bot_username}" if telegram_bot_username else ""
 
 # ===== 頁面標題 =====
 st.markdown("""
@@ -62,6 +67,22 @@ with n4:
                 '</div>', unsafe_allow_html=True)
     st.page_link("pages/4_Bot.py", label="前往 Demo Bot",
                  use_container_width=True)
+
+if telegram_bot_url:
+    st.subheader("Telegram")
+    tg_info_col, tg_action_col = st.columns([2.2, 1])
+    with tg_info_col:
+        st.markdown("""
+        <div class="earth-card" style="margin-bottom:0;">
+          <div style="font-size:1rem;font-weight:700;color:#4a5759;margin-bottom:0.4rem;">Telegram 機器人</div>
+          <div style="font-size:0.85rem;color:#6b6b6b;line-height:1.7;">
+            可直接用 Telegram 加好友並開始提問，適合提供給未登入後台的使用者。
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+    with tg_action_col:
+        st.markdown("<div style='height:0.7rem;'></div>", unsafe_allow_html=True)
+        st.link_button("加 Telegram 好友", telegram_bot_url, use_container_width=True)
 
 
 st.divider()

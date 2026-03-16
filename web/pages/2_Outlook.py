@@ -1,7 +1,7 @@
 """
 Outlook 管理頁：PST 匯入與全域歸檔規則
 """
-from utils import inject_css, page_header, api_get, api_post, api_delete, get_api_url, format_tw_datetime
+from utils import inject_css, page_header, api_get, api_post, api_delete, get_api_url, format_tw_datetime, require_admin_auth
 import os
 import sys
 
@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 st.set_page_config(page_title="ElenB - Outlook", page_icon="📬", layout="wide")
 inject_css()
+require_admin_auth()
 page_header("📬", "Outlook Mails", "設定規則後匯入 PST，系統會自動把信件放進對應專案的 mail 資料夾")
 
 flash_message = st.session_state.pop("outlook_flash_message", None)

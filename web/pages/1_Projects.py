@@ -1,7 +1,7 @@
 """
 Upload 主頁：檔案上傳 + 錄音上傳 + 專案設定
 """
-from utils import inject_css, page_header, api_get, api_post, api_delete
+from utils import inject_css, page_header, api_get, api_post, api_delete, require_admin_auth
 import streamlit.components.v1 as components
 import streamlit as st
 import sys
@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 st.set_page_config(page_title="ElenB - Projects", page_icon="📁", layout="wide")
 inject_css()
+require_admin_auth()
 page_header("📁", "專案管理", "上傳檔案並管理專案/資料夾")
 
 if "manage_flash_msg" in st.session_state:

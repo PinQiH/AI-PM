@@ -64,9 +64,16 @@ OPENAI_API_KEY=...
 ```env
 COMPOSE_PROFILES=telegram
 TELEGRAM_BOT_TOKEN=...
+TELEGRAM_BOT_USERNAME=...
 TELEGRAM_DEFAULT_PROJECT_ID=...
 PUBLIC_API_BASE_URL=http://localhost:8000
 TELEGRAM_IDLE_TIMEOUT_MINUTES=30
+```
+
+若要啟用 Web 管理頁密碼：
+
+```env
+WEB_ADMIN_PASSWORD=...
 ```
 
 ## 啟動方式
@@ -140,6 +147,12 @@ curl -OJ http://localhost:8000/admin/backup
 - 備份 API 依賴 `pg_dump`，更新程式後需重新 build `api` 映像
 - 由於回傳的是單一 zip，三個備份項目會包在同一個壓縮檔內下載
 
+若更新了 `.env` 內的 `WEB_ADMIN_PASSWORD`、`TELEGRAM_BOT_USERNAME` 等 Web 相關環境變數，需重建 `web` 容器：
+
+```bash
+docker compose up -d --force-recreate web
+```
+
 ## Outlook 匯入
 
 支援：
@@ -164,10 +177,22 @@ curl -OJ http://localhost:8000/admin/backup
 
 目前主要頁面：
 
+- `web/admin.py`: 首頁 Dashboard、Telegram 加好友入口、備份下載入口
 - `web/pages/1_Projects.py`: 專案與資料夾管理
 - `web/pages/2_Outlook.py`: Outlook 規則、分類預覽、PST/CSV 匯入
 - `web/pages/3_Files.py`: 檔案總覽
 - `web/pages/4_Bot.py`: RAG 問答
+
+### 管理頁登入
+
+- 進入 `web` 首頁與各子頁時，會先要求輸入 `WEB_ADMIN_PASSWORD`
+- 驗證通過後，同一個 Streamlit session 內可持續使用各頁功能
+- 按下側邊欄的 `登出`、重開新 session、或 `web` 容器重啟後，需要重新輸入密碼
+
+### Telegram 入口
+
+- 若有設定 `TELEGRAM_BOT_USERNAME`，首頁會顯示「加 Telegram 好友」按鈕
+- 連結格式為 `https://t.me/<bot_username>`
 
 ## 開發注意事項
 

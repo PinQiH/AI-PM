@@ -1,7 +1,7 @@
 """
 檔案總覽頁面：層級式導覽 (專案 -> 資料夾 -> 檔案)
 """
-from utils import inject_css, page_header, status_badge, api_get, api_delete, api_patch, get_external_api_url, format_tw_datetime
+from utils import inject_css, page_header, status_badge, api_get, api_delete, api_patch, get_external_api_url, format_tw_datetime, require_admin_auth
 import requests
 import pandas as pd
 import io
@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 st.set_page_config(page_title="ElenB - 檔案總覽", page_icon="📁", layout="wide")
 inject_css()
+require_admin_auth()
 page_header("📋", "檔案總覽", "管理各專案的文件與其層級結構")
 
 # ===== 導覽狀態管理 =====

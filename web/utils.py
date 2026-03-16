@@ -1,6 +1,7 @@
 """
 共用工具模組：CSS 主題注入與輔助函式
 """
+import hmac
 import streamlit as st
 import os
 import requests
@@ -9,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 INTERNAL_API_URL = os.getenv("API_URL", "http://api:8000")
 TAIWAN_TZ = ZoneInfo("Asia/Taipei")
+WEB_ADMIN_PASSWORD = os.getenv("WEB_ADMIN_PASSWORD", "")
 
 def get_api_url():
   """供 Streamlit Server 呼叫 API (容器內網)"""
@@ -18,6 +20,46 @@ def get_external_api_url():
   """供 Browser 呼叫 API (外部存取，如果是 localhost 就取代 api 名稱)"""
   # 如果容器名稱是 api:8000，改為 localhost:8000 以便瀏覽器解析
   return INTERNAL_API_URL.replace("http://api:8000", "http://localhost:8000")
+
+
+def require_admin_auth():
+  """所有 Streamlit 頁面共用的簡易密碼保護。"""
+  if not WEB_ADMIN_PASSWORD:
+    st.error("系統尚未設定 WEB_ADMIN_PASSWORD，請先在 .env 設定後重新啟動 web。")
+    st.stop()
+
+  if st.session_state.get("admin_authenticated") is True:
+    with st.sidebar:
+      st.caption("已通過管理頁密碼驗證")
+      if st.button("登出", key="logout_admin_session", use_container_width=True):
+        st.session_state.admin_authenticated = False
+        st.rerun()
+    return
+
+  st.markdown("""
+    <div class="earth-card" style="max-width:520px;margin:3rem auto 0 auto;">
+      <div style="font-size:1.2rem;font-weight:700;color:#4a5759;margin-bottom:0.5rem;">管理頁登入</div>
+      <div style="font-size:0.92rem;color:#6b6b6b;line-height:1.7;">
+        請先輸入管理密碼，驗證通過後才可使用所有功能。
+      </div>
+    </div>
+  """, unsafe_allow_html=True)
+
+  with st.form("admin_password_form", clear_on_submit=False):
+    password = st.text_input("管理密碼", type="password")
+    submitted = st.form_submit_button("登入", use_container_width=True)
+
+  if submitted:
+    if hmac.compare_digest(password, WEB_ADMIN_PASSWORD):
+      st.session_state.admin_authenticated = True
+      st.session_state.pop("admin_auth_error", None)
+      st.rerun()
+    st.session_state.admin_auth_error = "密碼錯誤，請重新輸入。"
+
+  if st.session_state.get("admin_auth_error"):
+    st.error(st.session_state["admin_auth_error"])
+
+  st.stop()
 
 
 def format_tw_datetime(value, fmt: str = "%Y/%m/%d %H:%M") -> str:

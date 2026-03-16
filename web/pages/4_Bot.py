@@ -9,11 +9,12 @@ import io
 import pandas as pd
 import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from utils import inject_css, page_header, api_get, api_post, get_external_api_url, get_api_url
+from utils import inject_css, page_header, api_get, api_post, get_external_api_url, get_api_url, require_admin_auth
 
 
 st.set_page_config(page_title="ElenB - Demo Bot", page_icon="🤖", layout="wide")
 inject_css()
+require_admin_auth()
 page_header("🤖", "Demo Bot", "從知識庫中搜尋答案 — 請先選擇專案再開始提問")
 
 GREETING = "你好，我是 ElenB，你的虛擬 PM。"

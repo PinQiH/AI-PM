@@ -82,6 +82,8 @@ services:
       - .:/app
     environment:
       - API_URL=http://api:8000
+      - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
+      - WEB_ADMIN_PASSWORD=${WEB_ADMIN_PASSWORD}
     ports:
       - "8501:8501"
     depends_on:
