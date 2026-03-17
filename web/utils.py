@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 INTERNAL_API_URL = os.getenv("API_URL", "http://api:8000")
+PUBLIC_API_BASE_URL = os.getenv("PUBLIC_API_BASE_URL", "http://localhost:8000")
 TAIWAN_TZ = ZoneInfo("Asia/Taipei")
 WEB_ADMIN_PASSWORD = os.getenv("WEB_ADMIN_PASSWORD", "")
 
@@ -17,9 +18,8 @@ def get_api_url():
   return INTERNAL_API_URL
 
 def get_external_api_url():
-  """供 Browser 呼叫 API (外部存取，如果是 localhost 就取代 api 名稱)"""
-  # 如果容器名稱是 api:8000，改為 localhost:8000 以便瀏覽器解析
-  return INTERNAL_API_URL.replace("http://api:8000", "http://localhost:8000")
+  """供 Browser 呼叫 API (外部存取)。"""
+  return PUBLIC_API_BASE_URL.rstrip("/")
 
 
 def require_admin_auth():

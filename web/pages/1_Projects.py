@@ -1,7 +1,7 @@
 """
 Upload 主頁：檔案上傳 + 錄音上傳 + 專案設定
 """
-from utils import inject_css, page_header, api_get, api_post, api_delete, require_admin_auth
+from utils import inject_css, page_header, api_get, api_post, api_delete, require_admin_auth, get_external_api_url
 import streamlit.components.v1 as components
 import streamlit as st
 import sys
@@ -184,13 +184,7 @@ with tab_upload:
         </div>
 
         <script>
-          let API_HOST = 'localhost';
-          try {
-            if (window.parent && window.parent.location && window.parent.location.hostname) {
-              API_HOST = window.parent.location.hostname;
-            }
-          } catch (e) {}
-          const API_URL = "http://" + API_HOST + ":8000";
+          const API_URL = "__PUBLIC_API_BASE_URL__";
           const PROJECT_ID = "__PROJECT_ID__";
           const FOLDER_ID = "__FOLDER_ID__";
 
@@ -284,9 +278,9 @@ with tab_upload:
             }
           });
         </script>
-      """.replace("__PROJECT_ID__", str(project_id or "")).replace("__FOLDER_ID__", str(folder_id or ""))
+      """.replace("__PUBLIC_API_BASE_URL__", get_external_api_url()).replace("__PROJECT_ID__", str(project_id or "")).replace("__FOLDER_ID__", str(folder_id or ""))
             components.html(recorder_html, height=520, scrolling=False)
-            st.caption("注意：瀏覽器錄音會直接呼叫 API（`POST /upload`）。")
+            st.caption(f"注意：瀏覽器錄音會直接呼叫 API（`POST {get_external_api_url()}/upload`）。")
 
 with tab_manage:
     col_form, col_list = st.columns([1, 1], gap="large")
