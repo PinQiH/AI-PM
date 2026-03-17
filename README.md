@@ -57,46 +57,86 @@ POSTGRES_USER=...
 POSTGRES_PASSWORD=...
 POSTGRES_DB=...
 OPENAI_API_KEY=...
+WEB_ADMIN_PASSWORD=...
+PUBLIC_API_BASE_URL=...
+CORS_ALLOWED_ORIGINS=...
+```
+
+開發環境建議：
+
+```env
+PUBLIC_API_BASE_URL=http://localhost:8000/api
+CORS_ALLOWED_ORIGINS=http://localhost:8501,http://127.0.0.1:8501
+```
+
+正式環境建議：
+
+```env
+PUBLIC_API_BASE_URL=https://elenb.gogotest.xyz/api
+CORS_ALLOWED_ORIGINS=https://elenb.gogotest.xyz
+COMPOSE_PROFILES=telegram
 ```
 
 若要啟用 Telegram：
 
 ```env
-COMPOSE_PROFILES=telegram
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_BOT_USERNAME=...
 TELEGRAM_DEFAULT_PROJECT_ID=...
-PUBLIC_API_BASE_URL=http://localhost:8000
 TELEGRAM_IDLE_TIMEOUT_MINUTES=30
-```
-
-若要啟用 Web 管理頁密碼：
-
-```env
-WEB_ADMIN_PASSWORD=...
 ```
 
 ## 啟動方式
 
-啟動核心服務：
+### 開發環境
+
+開發環境會保留 bind mount 與對外 port，方便直接改碼測試；`telegram_bot` 預設不啟用。
 
 ```bash
 docker compose up -d --build
 ```
 
-第一次啟動或有新 migration 時，執行：
+若開發時需要 Telegram polling，可暫時啟用：
+
+```bash
+COMPOSE_PROFILES=telegram docker compose up -d --build
+```
+
+### 正式環境
+
+正式環境請使用獨立的 `docker-compose.prod.yml`。這份設定會：
+
+- 移除 `api` / `worker` / `web` / `telegram_bot` 的 bind mount
+- 將 `uploads/` 改成持久化 volume
+- 將 `web` 與 `api` 綁到主機 `127.0.0.1`
+- 依 `.env` 的 `COMPOSE_PROFILES=telegram` 啟用 `telegram_bot`
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+第一次啟動或有新 migration 時：
 
 ```bash
 docker compose exec api alembic upgrade head
 ```
 
+正式環境請改用：
+
+```bash
+docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+```
+
 服務入口：
 
-- API: `http://localhost:8000`
-- API health: `http://localhost:8000/health`
-- Web: `http://localhost:8501`
-- PostgreSQL: `localhost:5434`
-- Redis: `localhost:6379`
+- 開發 Web: `http://localhost:8501`
+- 開發 API: `http://localhost:8000/api`
+- 開發 PostgreSQL: `localhost:5434`
+- 開發 Redis: `localhost:6379`
+- 正式 Web 對外網址：`https://elenb.gogotest.xyz`
+- 正式 API 對外網址：`https://elenb.gogotest.xyz/api`
+- 正式主機本機 PostgreSQL: `127.0.0.1:5434`
+- 正式 Redis: 僅 Docker 內網，不對外開放
 
 ## 常用維運指令
 
@@ -133,7 +173,13 @@ docker compose logs -f worker
 下載系統備份：
 
 ```bash
-curl -OJ http://localhost:8000/admin/backup
+curl -OJ http://localhost:8000/api/admin/backup
+```
+
+正式環境若從主機本機操作，可改用：
+
+```bash
+curl -OJ http://127.0.0.1:8000/api/admin/backup
 ```
 
 備份壓縮檔內容包含：
@@ -147,10 +193,16 @@ curl -OJ http://localhost:8000/admin/backup
 - 備份 API 依賴 `pg_dump`，更新程式後需重新 build `api` 映像
 - 由於回傳的是單一 zip，三個備份項目會包在同一個壓縮檔內下載
 
-若更新了 `.env` 內的 `WEB_ADMIN_PASSWORD`、`TELEGRAM_BOT_USERNAME` 等 Web 相關環境變數，需重建 `web` 容器：
+若更新了 `.env` 內的 `WEB_ADMIN_PASSWORD`、`TELEGRAM_BOT_USERNAME`、`PUBLIC_API_BASE_URL` 等 Web 相關環境變數，需重建 `web` 容器：
 
 ```bash
 docker compose up -d --force-recreate web
+```
+
+正式環境請改用 production compose：
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --force-recreate web
 ```
 
 ## Outlook 匯入
@@ -193,6 +245,21 @@ docker compose up -d --force-recreate web
 
 - 若有設定 `TELEGRAM_BOT_USERNAME`，首頁會顯示「加 Telegram 好友」按鈕
 - 連結格式為 `https://t.me/<bot_username>`
+
+## 正式環境反向代理需求
+
+正式環境預期由 Nginx 代理：
+
+- `https://elenb.gogotest.xyz/` -> `http://127.0.0.1:8501`
+- `https://elenb.gogotest.xyz/api/` -> `http://127.0.0.1:8000/api/`
+
+請確認：
+
+- `/api/upload` 可接受大檔案上傳
+- `/api/upload/<id>/download` 可正常下載檔案
+- 瀏覽器錄音上傳與下載都會走 `PUBLIC_API_BASE_URL`
+- Nginx 不需要移除 `/api` 前綴，直接原樣轉發
+- API 不直接暴露公網 port
 
 ## 開發注意事項
 

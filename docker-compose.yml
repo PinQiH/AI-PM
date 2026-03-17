@@ -21,6 +21,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - .:/app
     env_file:
@@ -69,6 +70,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
       - TELEGRAM_DEFAULT_PROJECT_ID=${TELEGRAM_DEFAULT_PROJECT_ID}
       - PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL}
     depends_on:
@@ -81,7 +83,8 @@ services:
     volumes:
       - .:/app
     environment:
-      - API_URL=http://api:8000
+      - API_URL=http://api:8000/api
+      - PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL}
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
       - WEB_ADMIN_PASSWORD=${WEB_ADMIN_PASSWORD}
     ports:
