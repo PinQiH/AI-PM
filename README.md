@@ -75,6 +75,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:8501,http://127.0.0.1:8501
 PUBLIC_API_BASE_URL=https://elenb.gogotest.xyz/api
 CORS_ALLOWED_ORIGINS=https://elenb.gogotest.xyz
 COMPOSE_PROFILES=telegram
+COMPOSE_PROJECT_NAME=elenb
 ```
 
 若要啟用 Telegram：
@@ -110,6 +111,7 @@ COMPOSE_PROFILES=telegram docker compose up -d --build
 - 將 `uploads/` 改成持久化 volume
 - 將 `web` 與 `api` 綁到主機 `127.0.0.1`
 - 依 `.env` 的 `COMPOSE_PROFILES=telegram` 啟用 `telegram_bot`
+- 建議搭配 `COMPOSE_PROJECT_NAME=elenb`，避免容器、network、volume 名稱與其他系統混淆
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
