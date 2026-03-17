@@ -21,6 +21,7 @@ tab_upload, tab_manage = st.tabs(["上傳檔案", "專案設定"])
 
 with tab_upload:
     st.subheader("選擇上傳目標")
+    st.warning("此系統使用雲端模型處理內容，請勿上傳機密文件、帳號密碼、金鑰或其他敏感資料。")
     projects, perr = api_get("/projects")
     if perr:
         st.error(perr)
@@ -125,6 +126,10 @@ with tab_upload:
             st.markdown("""
         <p style="color:#4a5759;font-size:0.95rem;margin-bottom:1rem;">
           透過麥克風直接錄製會議或備忘，錄製完成後上傳為 <code>.webm</code> 音訊。
+        </p>
+        <p style="color:#7a6e6e;font-size:0.9rem;margin-top:-0.35rem;margin-bottom:1rem;">
+          建議可錄製：<code>專案近況</code>、<code>專案待辦事項</code>、<code>風險與阻塞</code>、
+          <code>決策原因</code>、<code>交接提醒</code> 等內容，方便後續查詢與交接。
         </p>
       """, unsafe_allow_html=True)
 
@@ -390,7 +395,8 @@ with tab_manage:
                     format_func=lambda p: f"{p['name']}  (ID: {p['id']})",
                 )
                 confirm_project = st.checkbox("我確認要刪除此專案與其底下所有內容")
-                del_project_submit = st.form_submit_button("刪除專案", type="secondary")
+                del_project_submit = st.form_submit_button(
+                    "刪除專案", type="secondary")
                 if del_project_submit:
                     if not confirm_project:
                         st.error("請先勾選確認。")
@@ -410,7 +416,8 @@ with tab_manage:
                     options=projects_for_delete,
                     format_func=lambda p: f"{p['name']}  (ID: {p['id']})",
                 )
-                folder_candidates, ferr = api_get("/folders", params={"project_id": folder_project["id"]})
+                folder_candidates, ferr = api_get(
+                    "/folders", params={"project_id": folder_project["id"]})
                 folder_candidates = folder_candidates or []
                 if ferr:
                     st.error(ferr)
@@ -422,7 +429,8 @@ with tab_manage:
                         format_func=lambda f: f"{f['name']}  (ID: {f['id']})",
                     )
                     confirm_folder = st.checkbox("我確認要刪除此資料夾與其底下所有內容")
-                    del_folder_submit = st.form_submit_button("刪除資料夾", type="secondary")
+                    del_folder_submit = st.form_submit_button(
+                        "刪除資料夾", type="secondary")
                     if del_folder_submit:
                         if not confirm_folder:
                             st.error("請先勾選確認。")
