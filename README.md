@@ -263,6 +263,22 @@ docker compose -f docker-compose.prod.yml up -d --force-recreate web
 - Nginx 不需要移除 `/api` 前綴，直接原樣轉發
 - API 不直接暴露公網 port
 
+建議先確認 `.env` 至少是這兩個正式值：
+
+```env
+PUBLIC_API_BASE_URL=https://elenb.gogotest.xyz/api
+CORS_ALLOWED_ORIGINS=https://elenb.gogotest.xyz
+```
+
+可直接參考 [deploy/nginx/elenb.conf.example](/mnt/d/ElenB/deploy/nginx/elenb.conf.example)。
+
+若網頁打開後一直停在轉圈，通常不是 `web` 容器沒起來，而是 Nginx 沒有正確轉發 Streamlit 的 websocket。請特別確認：
+
+- `location /` 有轉發到 `http://127.0.0.1:8501`
+- 有帶 `Upgrade` / `Connection` header
+- `proxy_read_timeout` 夠長，不要太快切斷長連線
+- 瀏覽器開發者工具的 Network 裡，`/_stcore/stream` 不能失敗
+
 ## 開發注意事項
 
 - `api` 使用 `uvicorn --reload`，後端開發時通常會自動重載

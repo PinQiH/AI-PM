@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 INTERNAL_API_URL = os.getenv("API_URL", "http://api:8000")
-PUBLIC_API_BASE_URL = os.getenv("PUBLIC_API_BASE_URL", "http://localhost:8000")
+PUBLIC_API_BASE_URL = os.getenv("PUBLIC_API_BASE_URL", "http://localhost:8000/api")
 TAIWAN_TZ = ZoneInfo("Asia/Taipei")
 WEB_ADMIN_PASSWORD = os.getenv("WEB_ADMIN_PASSWORD", "")
 

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     TELEGRAM_DEFAULT_PROJECT_ID: str = os.getenv(
         "TELEGRAM_DEFAULT_PROJECT_ID", "")
     PUBLIC_API_BASE_URL: str = os.getenv(
-        "PUBLIC_API_BASE_URL", "http://localhost:8000")
+        "PUBLIC_API_BASE_URL", "http://localhost:8000/api")
     TELEGRAM_IDLE_TIMEOUT_MINUTES: str = os.getenv(
         "TELEGRAM_IDLE_TIMEOUT_MINUTES", "30")
 
