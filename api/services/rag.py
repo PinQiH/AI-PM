@@ -27,7 +27,8 @@ def run_rag_query(
         if row.sender:
             parts.append(f"寄件者：{row.sender}")
         if row.sent_at:
-            sent_at = row.sent_at.isoformat() if hasattr(row.sent_at, "isoformat") else str(row.sent_at)
+            sent_at = row.sent_at.isoformat() if hasattr(
+                row.sent_at, "isoformat") else str(row.sent_at)
             parts.append(f"時間：{sent_at}")
         return "\n".join(parts)
 
@@ -53,7 +54,8 @@ def run_rag_query(
         )
         results = db.execute(
             stmt,
-            {"vector": str(query_vector), "project_id": str(project_id), "top_k": top_k},
+            {"vector": str(query_vector), "project_id": str(
+                project_id), "top_k": top_k},
         ).fetchall()
     else:
         stmt = text(
@@ -74,7 +76,8 @@ def run_rag_query(
             LIMIT :top_k
             """
         )
-        results = db.execute(stmt, {"vector": str(query_vector), "top_k": top_k}).fetchall()
+        results = db.execute(stmt, {"vector": str(
+            query_vector), "top_k": top_k}).fetchall()
 
     if not results:
         return QueryResponse(answer="該專案下尚未建立任何知識庫資料，請先上傳檔案。", sources=[])
@@ -135,7 +138,7 @@ def run_rag_query(
     )
 
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-5.4",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
