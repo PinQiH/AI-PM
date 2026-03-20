@@ -320,65 +320,105 @@ def _create_pst_attachment_file(db, email_file: FileRecord, target_project_id: i
 
 @celery.task(name="process_document_task", bind=True, max_retries=3)
 def process_document_task(self, file_record_id: int, file_path: str, metadata: dict | None = None):
-    db = SessionLocal()
-    try:
-        file_record = db.query(FileRecord).filter(FileRecord.id == file_record_id).first()
-        if not file_record:
-            print(f"FileRecord {file_record_id} not found.")
-            return
+  db = SessionLocal()
+  try:
+    file_record = db.query(FileRecord).filter(FileRecord.id == file_record_id).first()
+    if not file_record:
+      print(f"FileRecord {file_record_id} not found.")
+      return
 
-        file_record.status = "processing"
+    file_record.status = "processing"
+    db.commit()
+
+    # --- 1. MD5 背景計算與查重 ---
+    from api.services.utils import calculate_md5_from_path
+    md5_hash = calculate_md5_from_path(file_path)
+    file_record.md5_hash = md5_hash
+
+    # 檢查同專案中是否已有相同內容且已完成處理的檔案
+    stmt_existing = select(FileRecord).where(
+      FileRecord.md5_hash == md5_hash,
+      FileRecord.project_id == file_record.project_id,
+      FileRecord.status == "completed",
+      FileRecord.id != file_record.id
+    ).limit(1)
+    existing_record = db.execute(stmt_existing).scalar_one_or_none()
+
+    if existing_record:
+      print(f"Duplicate content found for file {file_record_id} (MD5: {md5_hash}). Reusing existing fragments.")
+      
+      # 判斷是否在同一個資料夾
+      if existing_record.folder_id == file_record.folder_id:
+        print(f"Same folder duplicate detected. Removing record {file_record_id} to keep folder clean.")
+        db.delete(file_record)
         db.commit()
+        if os.path.exists(file_path):
+          os.remove(file_path)
+        return {"status": "removed_as_duplicate", "orig_id": existing_record.id}
 
-        file_type = file_record.file_type.lower()
-        print(f"Start processing document: ID={file_record_id}, Type={file_type}, Path={file_path}")
+      # 不同資料夾但同專案：保留紀錄，但將路徑重定向到現有檔案，並標記完成
+      file_record.status = "completed"
+      file_record.file_path = existing_record.file_path # 指向現有的實體檔路徑 (修復 404)
+      file_record.error_msg = f"Duplicate content (same MD5 as file {existing_record.id}). Knowledge chunks reused."
+      
+      # 刪除新產生的冗餘實體檔案以節省空間
+      if os.path.exists(file_path):
+        os.remove(file_path)
+      
+      db.commit()
+      return {"status": "duplicate_redirected", "reused_from": existing_record.id}
 
-        extracted_text = ""
-        audio_extensions = ["mp3", "m4a", "wav", "webm", "mp4"]
-        document_extensions = ["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls"]
+    # --- 2. 正常處理流程 ---
+    db.commit()
+    file_type = file_record.file_type.lower()
+    print(f"Start processing document: ID={file_record_id}, Type={file_type}, Path={file_path}")
 
-        if file_type in audio_extensions:
-            extracted_text = transcribe_audio(file_path)
-        elif file_type in document_extensions:
-            extracted_text = extract_text_for_record(file_record)
-        else:
-            raise ValueError(f"Unsupported file type: {file_type}")
+    extracted_text = ""
+    audio_extensions = ["mp3", "m4a", "wav", "webm", "mp4"]
+    document_extensions = ["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls"]
 
-        metadata = metadata or {}
-        sent_at = metadata.get("sent_at")
-        if isinstance(sent_at, str):
-            sent_at = parse_graph_datetime(sent_at)
-        chunks_count = replace_knowledge_chunks(
-            db,
-            file_record,
-            extracted_text,
-            chunk_type=metadata.get("chunk_type"),
-            sender=metadata.get("sender"),
-            sent_at=sent_at,
-            conversation_id=metadata.get("conversation_id"),
-        )
-        print(f"File {file_record_id} split into {chunks_count} chunks.")
+    if file_type in audio_extensions:
+      extracted_text = transcribe_audio(file_path)
+    elif file_type in document_extensions:
+      extracted_text = extract_text_for_record(file_record)
+    else:
+      raise ValueError(f"Unsupported file type: {file_type}")
 
-        file_record.status = "completed"
-        db.commit()
-        print(f"Document {file_record_id} processed successfully.")
+    metadata = metadata or {}
+    sent_at = metadata.get("sent_at")
+    if isinstance(sent_at, str):
+      sent_at = parse_graph_datetime(sent_at)
+    chunks_count = replace_knowledge_chunks(
+      db,
+      file_record,
+      extracted_text,
+      chunk_type=metadata.get("chunk_type"),
+      sender=metadata.get("sender"),
+      sent_at=sent_at,
+      conversation_id=metadata.get("conversation_id"),
+    )
+    print(f"File {file_record_id} split into {chunks_count} chunks.")
 
-        return {"status": "success", "file": file_path, "chunks": chunks_count}
+    file_record.status = "completed"
+    db.commit()
+    print(f"Document {file_record_id} processed successfully.")
 
-    except Exception as exc:
-        print(f"Error processing document {file_record_id}: {exc}")
-        traceback.print_exc()
-        db.rollback()
-        file_record = db.query(FileRecord).filter(FileRecord.id == file_record_id).first()
-        if file_record:
-            file_record.status = "failed"
-            file_record.error_msg = str(exc)
-            db.commit()
+    return {"status": "success", "file": file_path, "chunks": chunks_count}
 
-        raise self.retry(exc=exc, countdown=60)
+  except Exception as exc:
+    print(f"Error processing document {file_record_id}: {exc}")
+    traceback.print_exc()
+    db.rollback()
+    file_record = db.query(FileRecord).filter(FileRecord.id == file_record_id).first()
+    if file_record:
+      file_record.status = "failed"
+      file_record.error_msg = str(exc)
+      db.commit()
 
-    finally:
-        db.close()
+    raise self.retry(exc=exc, countdown=60)
+
+  finally:
+    db.close()
 
 
 @celery.task(name="sync_outlook_mailbox_task", bind=True, max_retries=2)

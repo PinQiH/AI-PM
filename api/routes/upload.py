@@ -31,6 +31,22 @@ def get_db():
 def _delete_file_record_tree(record: FileRecord, db: Session):
   for child in list(record.child_files or []):
     _delete_file_record_tree(child, db)
+  
+  # 若此 record 是知識碎片的擁有者，嘗試移交給同專案中擁有相同 MD5 的其他 record
+  if record.md5_hash:
+    stmt_alt = select(FileRecord).where(
+      FileRecord.md5_hash == record.md5_hash,
+      FileRecord.project_id == record.project_id,
+      FileRecord.id != record.id
+    ).limit(1)
+    alt_record = db.execute(stmt_alt).scalar_one_or_none()
+    
+    if alt_record:
+      # 轉移所有權
+      for fragment in record.knowledge_fragments:
+        fragment.file_id = alt_record.id
+      db.flush()
+  
   if os.path.exists(record.file_path):
     os.remove(record.file_path)
   db.delete(record)
@@ -42,7 +58,7 @@ async def upload_file(
   folder_id: Optional[int] = Form(None),
   db: Session = Depends(get_db)
 ):
-  # 1. 儲存檔案
+  # 1. 簡約上傳：直接儲存檔案，MD5 與去重移至 Worker 處理
   file_ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
   unique_filename = f"{uuid.uuid4()}_{file.filename}"
   file_path = os.path.join(UPLOAD_DIR, unique_filename)
@@ -50,7 +66,7 @@ async def upload_file(
   with open(file_path, "wb") as buffer:
     shutil.copyfileobj(file.file, buffer)
 
-  # 2. 建立 FileRecord
+  # 2. 建立 FileRecord (Status=pending)
   db_file_record = FileRecord(
     filename=file.filename,
     file_type=file_ext,
@@ -65,7 +81,7 @@ async def upload_file(
   db.commit()
   db.refresh(db_file_record)
 
-  # 3. 發送 Celery 任務進行背景處理 (Early Return)
+  # 3. 發送 Celery 任務進行背景處理 (包含 MD5 計算與查重)
   process_document_task.delay(file_record_id=db_file_record.id, file_path=file_path)
 
   return db_file_record

@@ -8,18 +8,24 @@ import requests
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-INTERNAL_API_URL = os.getenv("API_URL", "http://api:8000")
+INTERNAL_API_URL = os.getenv("API_URL", "http://api:8000/api")
 PUBLIC_API_BASE_URL = os.getenv("PUBLIC_API_BASE_URL", "http://localhost:8000/api")
 TAIWAN_TZ = ZoneInfo("Asia/Taipei")
 WEB_ADMIN_PASSWORD = os.getenv("WEB_ADMIN_PASSWORD", "")
 
 def get_api_url():
   """供 Streamlit Server 呼叫 API (容器內網)"""
-  return INTERNAL_API_URL
+  url = INTERNAL_API_URL.rstrip("/")
+  if not url.endswith("/api"):
+    url += "/api"
+  return url
 
 def get_external_api_url():
   """供 Browser 呼叫 API (外部存取)。"""
-  return PUBLIC_API_BASE_URL.rstrip("/")
+  url = PUBLIC_API_BASE_URL.rstrip("/")
+  if not url.endswith("/api"):
+    url += "/api"
+  return url
 
 
 def require_admin_auth():
@@ -608,7 +614,7 @@ def status_badge(status: str) -> str:
 def api_get(path: str, params: dict = None):
   """統一的 GET 請求，回傳 (data, error)"""
   try:
-    resp = requests.get(f"{INTERNAL_API_URL}{path}", params=params, timeout=10)
+    resp = requests.get(f"{get_api_url()}{path}", params=params, timeout=10)
     resp.raise_for_status()
     return resp.json(), None
   except requests.exceptions.ConnectionError:
@@ -623,7 +629,7 @@ def api_post(path: str, json: dict = None, files=None, data: dict = None):
   """統一的 POST 請求，回傳 (data, error)"""
   try:
     resp = requests.post(
-      f"{INTERNAL_API_URL}{path}",
+      f"{get_api_url()}{path}",
       json=json,
       files=files,
       data=data,
@@ -642,7 +648,7 @@ def api_post(path: str, json: dict = None, files=None, data: dict = None):
 def api_delete(path: str):
   """統一的 DELETE 請求，回傳 (data, error)"""
   try:
-    resp = requests.delete(f"{INTERNAL_API_URL}{path}", timeout=10)
+    resp = requests.delete(f"{get_api_url()}{path}", timeout=10)
     resp.raise_for_status()
     return resp.json(), None
   except requests.exceptions.ConnectionError:
@@ -657,7 +663,7 @@ def api_patch(path: str, json: dict = None):
   """統一的 PATCH 請求，回傳 (data, error)"""
   try:
     resp = requests.patch(
-      f"{INTERNAL_API_URL}{path}",
+      f"{get_api_url()}{path}",
       json=json,
       timeout=30
     )

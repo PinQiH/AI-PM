@@ -18,6 +18,7 @@ class FileRecord(Base, TimestampMixin):
     sender: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     conversation_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    md5_hash: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default="pending") # pending, processing, completed, failed, cancelled
     cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     error_msg: Mapped[Optional[str]] = mapped_column(String, nullable=True)

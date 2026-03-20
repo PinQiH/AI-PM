@@ -14,6 +14,7 @@ class FileRecordBase(BaseModel):
     sender: Optional[str] = None
     sent_at: Optional[datetime] = None
     conversation_id: Optional[str] = None
+    md5_hash: Optional[str] = None
 
 class FileRecordResponse(FileRecordBase):
     id: int
