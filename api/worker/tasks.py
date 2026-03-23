@@ -394,6 +394,16 @@ def process_document_task(self, file_record_id: int, file_path: str, metadata: d
       db.commit()
       return {"status": "zip_processed_and_deleted"}
 
+    elif file_type == "rar":
+      print(f"RAR file detected. Processing contents for ID={file_record_id}")
+      _process_rar_contents(db, file_record, file_path)
+      # 處理完畢後刪除原本的 .rar 檔與紀錄
+      if os.path.exists(file_path):
+        os.remove(file_path)
+      db.delete(file_record)
+      db.commit()
+      return {"status": "rar_processed_and_deleted"}
+
     extracted_text = ""
     audio_extensions = ["mp3", "m4a", "wav", "webm", "mp4"]
     document_extensions = ["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls", "odt"]
@@ -537,6 +547,105 @@ def _process_zip_contents(db, zip_record: FileRecord, zip_path: str):
             process_document_task.delay(**task_kwargs)
             
         print(f"Successfully unpacked ZIP {zip_record.id} and created child records.")
+        
+    finally:
+        if os.path.exists(temp_extract_dir):
+            shutil.rmtree(temp_extract_dir)
+
+
+def _process_rar_contents(db, rar_record: FileRecord, rar_path: str):
+    """
+    解壓 RAR 並根據內部結構建立 Folder 與 FileRecord
+    """
+    import rarfile
+    import shutil
+    from pathlib import Path
+    
+    temp_extract_dir = os.path.join(UPLOAD_DIR, f"temp_rar_{rar_record.id}")
+    os.makedirs(temp_extract_dir, exist_ok=True)
+    
+    try:
+        with rarfile.RarFile(rar_path, 'r') as rar_ref:
+            rar_ref.extractall(temp_extract_dir)
+            
+        # 建立目錄路徑到 Folder ID 的映射，用來處理層級結構
+        # key: 相對路徑字串, value: Folder ID
+        folder_map = {}
+        pending_tasks = []
+        
+        # 遍歷解壓後的目錄
+        for root, dirs, files in os.walk(temp_extract_dir):
+            rel_root = os.path.relpath(root, temp_extract_dir)
+            if rel_root == ".":
+                current_folder_id = rar_record.folder_id
+            else:
+                # 確保父目錄已存在或使用 rar_record.folder_id 作為底層
+                parts = Path(rel_root).parts
+                parent_id = rar_record.folder_id
+                
+                path_acc = ""
+                for part in parts:
+                    path_acc = os.path.join(path_acc, part)
+                    if path_acc not in folder_map:
+                        # 檢查資料庫是否已有此資料夾 (同 project, 同 parent, 同 name)
+                        stmt = select(Folder).where(
+                            Folder.project_id == rar_record.project_id,
+                            Folder.parent_id == parent_id,
+                            Folder.name == part
+                        )
+                        folder = db.execute(stmt).scalar_one_or_none()
+                        
+                        if not folder:
+                            folder = Folder(
+                                name=part,
+                                project_id=rar_record.project_id,
+                                parent_id=parent_id
+                            )
+                            db.add(folder)
+                            db.flush() # 取得 ID
+                        
+                        folder_map[path_acc] = folder.id
+                    
+                    parent_id = folder_map[path_acc]
+                
+                current_folder_id = parent_id
+
+            # 處理此目錄下的檔案
+            supported_exts = ["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls", "odt", "mp3", "m4a", "wav", "webm", "mp4"]
+            for filename in files:
+                file_ext = filename.split(".")[-1].lower() if "." in filename else ""
+                if file_ext not in supported_exts:
+                    continue
+                
+                src_path = os.path.join(root, filename)
+                unique_filename = f"{uuid.uuid4()}_{filename}"
+                dest_path = os.path.join(UPLOAD_DIR, unique_filename)
+                shutil.copy2(src_path, dest_path)
+                
+                new_record = FileRecord(
+                    filename=filename,
+                    file_type=file_ext,
+                    file_path=dest_path,
+                    project_id=rar_record.project_id,
+                    folder_id=current_folder_id,
+                    status="pending",
+                    source_type="rar_extracted"
+                )
+                db.add(new_record)
+                db.flush()
+                
+                pending_tasks.append({
+                    "file_record_id": new_record.id,
+                    "file_path": dest_path
+                })
+        
+        db.commit()
+        
+        # 資料庫確保已寫入後，再發送非同步解析任務
+        for task_kwargs in pending_tasks:
+            process_document_task.delay(**task_kwargs)
+            
+        print(f"Successfully unpacked RAR {rar_record.id} and created child records.")
         
     finally:
         if os.path.exists(temp_extract_dir):

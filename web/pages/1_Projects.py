@@ -62,7 +62,7 @@ with tab_upload:
         <div style="margin-bottom:1rem;">
           <p style="color:#4a5759;font-size:0.95rem;">
             支援格式：<code>PDF</code> <code>DOCX/DOC</code> <code>ODT</code>
-            <code>TXT</code> <code>CSV</code> <code>XLSX</code> <code>ZIP</code>
+            <code>TXT</code> <code>CSV</code> <code>XLSX</code> <code>ZIP</code> <code>RAR</code>
             <code>MP3</code> <code>M4A</code> <code>WAV</code> <code>MP4</code>
           </p>
         </div>
@@ -74,9 +74,9 @@ with tab_upload:
                 st.session_state["upload_results"] = []
 
             uploaded_files = st.file_uploader(
-                "上傳檔案 (支援: PDF, Office, TXT, ODT, ZIP, CSV, MP3, M4A, WAV, MP4...)",
+                "上傳檔案 (支援: PDF, Office, TXT, ODT, ZIP, RAR, CSV, MP3, M4A, WAV, MP4...)",
                 accept_multiple_files=True,
-                type=["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls", "odt", "zip", "mp3", "m4a", "wav", "webm", "mp4"],
+                type=["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls", "odt", "zip", "rar", "mp3", "m4a", "wav", "webm", "mp4"],
                 label_visibility="collapsed",
                 key=f"uploader_{st.session_state['uploader_key']}"
             )

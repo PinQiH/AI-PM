@@ -3,9 +3,9 @@ FROM python:3.11-slim
 # 設定工作目錄
 WORKDIR /app
 
-# PST import 依賴 readpst
+# PST import 依賴 readpst 與 rarfile 解壓縮依賴 unrar-free
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends pst-utils postgresql-client \
+    && apt-get install -y --no-install-recommends pst-utils postgresql-client unrar-free \
     && rm -rf /var/lib/apt/lists/*
 
 # 複製 requirements.txt
