@@ -61,9 +61,9 @@ with tab_upload:
             st.markdown("""
         <div style="margin-bottom:1rem;">
           <p style="color:#4a5759;font-size:0.95rem;">
-            支援格式：<code>PDF</code> <code>DOCX</code> <code>DOC</code>
-            <code>TXT</code> <code>CSV</code> <code>XLSX</code>
-            <code>MP3</code> <code>M4A</code>
+            支援格式：<code>PDF</code> <code>DOCX/DOC</code> <code>ODT</code>
+            <code>TXT</code> <code>CSV</code> <code>XLSX</code> <code>ZIP</code>
+            <code>MP3</code> <code>M4A</code> <code>WAV</code> <code>MP4</code>
           </p>
         </div>
       """, unsafe_allow_html=True)
@@ -74,10 +74,9 @@ with tab_upload:
                 st.session_state["upload_results"] = []
 
             uploaded_files = st.file_uploader(
-                "將檔案拖曳至此，或點擊選取",
+                "上傳檔案 (支援: PDF, Office, TXT, ODT, ZIP, CSV, MP3, M4A, WAV, MP4...)",
                 accept_multiple_files=True,
-                type=["pdf", "docx", "doc", "txt",
-                      "csv", "xlsx", "xls", "mp3", "m4a"],
+                type=["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls", "odt", "zip", "mp3", "m4a", "wav", "webm", "mp4"],
                 label_visibility="collapsed",
                 key=f"uploader_{st.session_state['uploader_key']}"
             )

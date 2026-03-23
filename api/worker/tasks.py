@@ -58,7 +58,18 @@ def _delete_file_record(db, record: Optional[FileRecord]):
         return
     for child in list(record.child_files or []):
         _delete_file_record(db, child)
-    _delete_file_if_exists(record.file_path)
+    
+    if record.file_path and os.path.exists(record.file_path):
+        # 檢查是否還有其他 FileRecord 正在使用此實體路徑
+        other_usage = db.execute(
+            select(FileRecord).where(
+                FileRecord.file_path == record.file_path,
+                FileRecord.id != record.id
+            )
+        ).first()
+        if not other_usage:
+            os.remove(record.file_path)
+    
     db.delete(record)
 
 
@@ -373,9 +384,19 @@ def process_document_task(self, file_record_id: int, file_path: str, metadata: d
     file_type = file_record.file_type.lower()
     print(f"Start processing document: ID={file_record_id}, Type={file_type}, Path={file_path}")
 
+    if file_type == "zip":
+      print(f"ZIP file detected. Processing contents for ID={file_record_id}")
+      _process_zip_contents(db, file_record, file_path)
+      # 依據使用者要求：處理完畢後刪除原本的 .zip 檔與紀錄
+      if os.path.exists(file_path):
+        os.remove(file_path)
+      db.delete(file_record)
+      db.commit()
+      return {"status": "zip_processed_and_deleted"}
+
     extracted_text = ""
     audio_extensions = ["mp3", "m4a", "wav", "webm", "mp4"]
-    document_extensions = ["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls"]
+    document_extensions = ["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls", "odt"]
 
     if file_type in audio_extensions:
       extracted_text = transcribe_audio(file_path)
@@ -409,6 +430,8 @@ def process_document_task(self, file_record_id: int, file_path: str, metadata: d
     print(f"Error processing document {file_record_id}: {exc}")
     traceback.print_exc()
     db.rollback()
+    
+    # 若此時 record 還存在 (Zip 處理失敗時可能已被刪除或還在)
     file_record = db.query(FileRecord).filter(FileRecord.id == file_record_id).first()
     if file_record:
       file_record.status = "failed"
@@ -419,6 +442,97 @@ def process_document_task(self, file_record_id: int, file_path: str, metadata: d
 
   finally:
     db.close()
+
+
+def _process_zip_contents(db, zip_record: FileRecord, zip_path: str):
+    """
+    解壓 ZIP 並根據內部結構建立 Folder 與 FileRecord
+    """
+    import zipfile
+    import shutil
+    from pathlib import Path
+    
+    temp_extract_dir = os.path.join(UPLOAD_DIR, f"temp_zip_{zip_record.id}")
+    os.makedirs(temp_extract_dir, exist_ok=True)
+    
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(temp_extract_dir)
+            
+        # 建立目錄路徑到 Folder ID 的映射，用來處理層級結構
+        # key: 相對路徑字串, value: Folder ID
+        folder_map = {}
+        
+        # 遍歷解壓後的目錄
+        for root, dirs, files in os.walk(temp_extract_dir):
+            rel_root = os.path.relpath(root, temp_extract_dir)
+            if rel_root == ".":
+                current_folder_id = zip_record.folder_id
+            else:
+                # 確保父目錄已存在或使用 zip_record.folder_id 作為底層
+                parts = Path(rel_root).parts
+                parent_id = zip_record.folder_id
+                
+                path_acc = ""
+                for part in parts:
+                    path_acc = os.path.join(path_acc, part)
+                    if path_acc not in folder_map:
+                        # 檢查資料庫是否已有此資料夾 (同 project, 同 parent, 同 name)
+                        stmt = select(Folder).where(
+                            Folder.project_id == zip_record.project_id,
+                            Folder.parent_id == parent_id,
+                            Folder.name == part
+                        )
+                        folder = db.execute(stmt).scalar_one_or_none()
+                        
+                        if not folder:
+                            folder = Folder(
+                                name=part,
+                                project_id=zip_record.project_id,
+                                parent_id=parent_id
+                            )
+                            db.add(folder)
+                            db.flush() # 取得 ID
+                        
+                        folder_map[path_acc] = folder.id
+                    
+                    parent_id = folder_map[path_acc]
+                
+                current_folder_id = parent_id
+
+            # 處理此目錄下的檔案
+            supported_exts = ["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls", "odt", "mp3", "m4a", "wav", "webm", "mp4"]
+            for filename in files:
+                file_ext = filename.split(".")[-1].lower() if "." in filename else ""
+                if file_ext not in supported_exts:
+                    continue
+                
+                src_path = os.path.join(root, filename)
+                unique_filename = f"{uuid.uuid4()}_{filename}"
+                dest_path = os.path.join(UPLOAD_DIR, unique_filename)
+                shutil.copy2(src_path, dest_path)
+                
+                new_record = FileRecord(
+                    filename=filename,
+                    file_type=file_ext,
+                    file_path=dest_path,
+                    project_id=zip_record.project_id,
+                    folder_id=current_folder_id,
+                    status="pending",
+                    source_type="zip_extracted"
+                )
+                db.add(new_record)
+                db.flush()
+                
+                # 啟動新任務解析此檔案
+                process_document_task.delay(file_record_id=new_record.id, file_path=dest_path)
+        
+        db.commit()
+        print(f"Successfully unpacked ZIP {zip_record.id} and created child records.")
+        
+    finally:
+        if os.path.exists(temp_extract_dir):
+            shutil.rmtree(temp_extract_dir)
 
 
 @celery.task(name="sync_outlook_mailbox_task", bind=True, max_retries=2)

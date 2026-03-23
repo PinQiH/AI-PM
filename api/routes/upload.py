@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
@@ -13,6 +13,7 @@ from api.models.file_record import FileRecord
 from api.models.folder import Folder
 from api.models.knowledge import KnowledgeBase
 from api.schemas.file_record import FileRecordResponse, FileUpdateRequest, FileRecordListResponse
+from api.services.parser import extract_text_from_file
 from api.worker.tasks import process_document_task
 
 router = APIRouter(prefix="/upload", tags=["Upload"])
@@ -47,8 +48,14 @@ def _delete_file_record_tree(record: FileRecord, db: Session):
         fragment.file_id = alt_record.id
       db.flush()
   
-  if os.path.exists(record.file_path):
-    os.remove(record.file_path)
+  if record.file_path and os.path.exists(record.file_path):
+    # 檢查是否還有其他 FileRecord 正在使用此實體路徑
+    other_usage = db.execute(select(FileRecord).where(
+      FileRecord.file_path == record.file_path,
+      FileRecord.id != record.id
+    )).first()
+    if not other_usage:
+      os.remove(record.file_path)
   db.delete(record)
 
 @router.post("", response_model=FileRecordResponse)
@@ -237,7 +244,7 @@ def get_file_download(
     as_attachment: bool = False,
     db: Session = Depends(get_db),
 ):
-    """下載/獲取原始檔案，支援 Word 轉 HTML 預覽"""
+    """下載/獲取原始檔案，支援 Word 轉 HTML 與 ODT 文字預覽"""
     stmt = select(FileRecord).where(FileRecord.id == file_id)
     record = db.execute(stmt).scalar_one_or_none()
     if not record:
@@ -246,22 +253,28 @@ def get_file_download(
     if not os.path.exists(record.file_path):
         raise HTTPException(status_code=404, detail="Physical file not found on disk")
     
-    # 針對 Word 檔案的特殊預覽處理
-    if preview and record.file_type.lower() == "docx":
-        try:
-            import mammoth
-            with open(record.file_path, "rb") as docx_file:
-                result = mammoth.convert_to_html(docx_file)
-                html = f"""
-                <html>
-                <head><meta charset="utf-8"><style>body{{font-family:sans-serif;line-height:1.6;padding:20px;}}</style></head>
-                <body>{result.value}</body>
-                </html>
-                """
-                from fastapi import Response
-                return Response(content=html, media_type="text/html")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Word conversion failed: {str(e)}")
+    # 針對可轉文字格式的特殊預覽處理
+    if preview:
+        if record.file_type.lower() == "docx":
+            try:
+                import mammoth
+                with open(record.file_path, "rb") as docx_file:
+                    result = mammoth.convert_to_html(docx_file)
+                    html = f"""
+                    <html>
+                    <head><meta charset="utf-8"><style>body{{font-family:sans-serif;line-height:1.6;padding:20px;}}</style></head>
+                    <body>{result.value}</body>
+                    </html>
+                    """
+                    return Response(content=html, media_type="text/html")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Word conversion failed: {str(e)}")
+
+        if record.file_type.lower() == "odt":
+            extracted_text = extract_text_from_file(record.file_path, "odt")
+            if not extracted_text:
+                raise HTTPException(status_code=500, detail="ODT text extraction failed.")
+            return Response(content=extracted_text, media_type="text/plain; charset=utf-8")
 
     # 動態識別 MIME 類型
     mime_type, _ = mimetypes.guess_type(record.file_path)

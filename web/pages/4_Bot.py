@@ -199,8 +199,11 @@ def _show_source_preview_dialog(file_id: int, filename: str, file_type: str):
             st.image(dl_url, use_column_width=True)
         elif f_type in ["mp3", "m4a", "wav", "webm"]:
             st.audio(dl_url)
-        elif f_type in ["txt", "csv", "log"]:
-            resp = requests.get(f"{get_api_url()}/upload/{file_id}/download", timeout=20)
+        elif f_type in ["txt", "csv", "log", "odt"]:
+            preview_url = f"{get_api_url()}/upload/{file_id}/download"
+            if f_type == "odt":
+                preview_url = f"{preview_url}?preview=true"
+            resp = requests.get(preview_url, timeout=20)
             if resp.status_code == 200:
                 if f_type == "csv":
                     try:

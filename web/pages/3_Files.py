@@ -1,7 +1,7 @@
 """
 檔案總覽頁面：層級式導覽 (專案 -> 資料夾 -> 檔案)
 """
-from utils import inject_css, page_header, status_badge, api_get, api_delete, api_patch, get_external_api_url, format_tw_datetime, require_admin_auth
+from utils import inject_css, page_header, status_badge, api_get, api_delete, api_patch, get_external_api_url, get_api_url, format_tw_datetime, require_admin_auth
 import requests
 import pandas as pd
 import io
@@ -9,8 +9,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 st.set_page_config(page_title="ElenB - 檔案總覽", page_icon="📁", layout="wide")
 inject_css()
@@ -48,6 +48,7 @@ def go_to_folder(folder_id):
 # ===== 麵包屑導航 =====
 breadcrumb_cols = st.columns([8, 1])
 is_home = st.session_state.nav_project_id is None and st.session_state.nav_folder_id is None
+
 with breadcrumb_cols[0]:
     bc_html = '<div style="margin-bottom:1rem; font-size:1rem; color:#4a5759;">'
     bc_html += '<span style="cursor:pointer; color:#b0c4b1; font-weight:600;" onclick="window.location.reload();">🏠 首頁</span>'
@@ -69,7 +70,9 @@ with breadcrumb_cols[0]:
             bc_html += f' <span style="color:#dedbd2;">/</span> <span style="color:#4a5759;">{current_folder["name"]}</span>'
 
     bc_html += '</div>'
-    # 上一頁：資料夾層級回到父層，專案根目錄回到首頁
+    st.markdown(bc_html, unsafe_allow_html=True)
+
+    # 上一頁按鈕
     if st.button("⬅ 上一頁", disabled=is_home):
         if st.session_state.nav_folder_id is not None and st.session_state.nav_project_id is not None:
             folders, _ = api_get(
@@ -83,15 +86,14 @@ with breadcrumb_cols[0]:
         st.rerun()
 
 with breadcrumb_cols[1]:
-    if st.button("重新整理"):
+    if st.button("重新整理", key="refresh_top"):
         st.rerun()
+
 
 # ===== 預覽對話框 =====
 
-
 @st.experimental_dialog("直接預覽檔案內容", width="large")
 def show_preview(file_id, filename, file_type):
-    from utils import get_api_url
     dl_url = f"{get_external_api_url()}/upload/{file_id}/download"
     dl_download_url = f"{dl_url}?as_attachment=true"
     f_type = (file_type or "").lower()
@@ -100,12 +102,10 @@ def show_preview(file_id, filename, file_type):
 
     try:
         if f_type == "pdf":
-            # PDF 嵌入 (使用 iframe)
             pdf_display = f'<iframe src="{dl_url}" width="100%" height="800px" style="border:none;"></iframe>'
             st.markdown(pdf_display, unsafe_allow_html=True)
 
         elif f_type == "docx":
-            # Word 檔案透過後端轉 HTML 預覽
             word_url = f"{dl_url}?preview=true"
             word_display = f'<iframe src="{word_url}" width="100%" height="800px" style="border:none; background:white;"></iframe>'
             st.markdown(word_display, unsafe_allow_html=True)
@@ -116,74 +116,53 @@ def show_preview(file_id, filename, file_type):
         elif f_type in ["mp3", "m4a", "wav", "webm"]:
             st.audio(dl_url)
 
-        elif f_type in ["txt", "csv", "log"]:
-            # 這裡仍使用 INTERNAL_API_URL (透過 api_get/post 的內部 requests)
-            resp = requests.get(f"{get_api_url()}/upload/{file_id}/download")
+        elif f_type in ["txt", "csv", "log", "odt"]:
+            preview_url = f"{get_api_url()}/upload/{file_id}/download"
+            if f_type == "odt":
+                preview_url = f"{preview_url}?preview=true"
+            resp = requests.get(preview_url, timeout=20)
             if resp.status_code == 200:
                 if f_type == "csv":
                     try:
                         df = pd.read_csv(io.StringIO(resp.text))
                         st.dataframe(df, use_container_width=True)
                     except:
-                        st.text_area(
-                            "檔案內容 (文字型式)", value=resp.text, height=600)
+                        st.text_area("檔案內容 (文字型式)", value=resp.text, height=600)
                 else:
                     st.text_area("檔案內容", value=resp.text, height=600)
             else:
                 st.error("無法讀取檔案內容。")
 
         elif f_type in ["xlsx", "xls"]:
-            resp = requests.get(
-                f"{get_api_url()}/upload/{file_id}/download", timeout=30)
+            resp = requests.get(f"{get_api_url()}/upload/{file_id}/download", timeout=30)
             if resp.status_code == 200:
                 try:
                     excel_bytes = io.BytesIO(resp.content)
                     parsed_excel = None
                     parse_errors = []
-
-                    # 依副檔名優先指定引擎，失敗後再嘗試自動判斷
-                    preferred_engines = [
-                        "openpyxl", None] if f_type == "xlsx" else ["xlrd", None]
+                    preferred_engines = ["openpyxl", None] if f_type == "xlsx" else ["xlrd", None]
                     for engine in preferred_engines:
                         try:
-                            parsed_excel = pd.ExcelFile(
-                                excel_bytes, engine=engine) if engine else pd.ExcelFile(excel_bytes)
+                            parsed_excel = pd.ExcelFile(excel_bytes, engine=engine) if engine else pd.ExcelFile(excel_bytes)
                             break
                         except Exception as parse_err:
-                            parse_errors.append(
-                                f"{engine or 'auto'}: {parse_err}")
+                            parse_errors.append(f"{engine or 'auto'}: {parse_err}")
                             excel_bytes.seek(0)
-
                     if parsed_excel is None:
-                        raise ValueError(
-                            " / ".join(parse_errors) if parse_errors else "unknown parse error")
-
-                    selected_sheet = st.selectbox(
-                        "工作表", parsed_excel.sheet_names, key=f"xlsx_sheet_{file_id}")
+                        raise ValueError(" / ".join(parse_errors) if parse_errors else "unknown parse error")
+                    selected_sheet = st.selectbox("工作表", parsed_excel.sheet_names, key=f"xlsx_sheet_{file_id}")
                     df = pd.read_excel(parsed_excel, sheet_name=selected_sheet)
                     st.dataframe(df, use_container_width=True)
                 except Exception as xlsx_err:
                     st.warning("無法完整解析 Excel 內容，請改用下載檔案方式查看。")
                     st.caption(f"解析失敗原因：{xlsx_err}")
-                    if "openpyxl" in str(xlsx_err).lower():
-                        st.info("目前執行環境缺少 `openpyxl`，請在執行 Streamlit 的環境安裝後重啟服務。")
-                        st.code("pip install openpyxl==3.1.4")
-                    st.markdown(
-                        f'<a href="{dl_download_url}" target="_blank"><button style="background-color:#4a5759;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;">📥 下載原始檔案</button></a>',
-                        unsafe_allow_html=True,
-                    )
+                    st.markdown(f'<a href="{dl_download_url}" target="_blank"><button style="background-color:#4a5759;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;">📥 下載原始檔案</button></a>', unsafe_allow_html=True)
             else:
                 st.error("無法讀取 Excel 內容。")
-                st.markdown(
-                    f'<a href="{dl_download_url}" target="_blank"><button style="background-color:#4a5759;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;">📥 下載原始檔案</button></a>',
-                    unsafe_allow_html=True,
-                )
 
         elif f_type == "doc":
             st.warning(f"針對 `{f_type}` 格式暫不支援直接線上網頁預覽。")
-            st.info("請點擊下方按鈕下載至電腦查看。")
             st.markdown(f'<a href="{dl_download_url}" target="_blank"><button style="background-color:#4a5759;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;">📥 下載原始檔案</button></a>', unsafe_allow_html=True)
-
         else:
             st.info(f"此格式 (`{f_type}`) 暫不支援直接預覽。")
             st.markdown(f'<a href="{dl_download_url}" target="_blank"><button style="background-color:#4a5759;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;">📥 下載該檔案</button></a>', unsafe_allow_html=True)
@@ -196,8 +175,7 @@ def show_preview(file_id, filename, file_type):
 @st.experimental_dialog("修改檔名", width="small")
 def rename_file_dialog(file_id, filename):
     file_root, file_ext = os.path.splitext(filename)
-    new_root = st.text_input(
-        "新檔名（不含副檔名）", value=file_root, key=f"rename_root_{file_id}")
+    new_root = st.text_input("新檔名（不含副檔名）", value=file_root, key=f"rename_root_{file_id}")
     st.caption(f"副檔名固定為 `{file_ext}`")
 
     c1, c2 = st.columns(2)
@@ -211,8 +189,7 @@ def rename_file_dialog(file_id, filename):
             return
 
         new_filename = f"{cleaned_root}{file_ext}"
-        _, err = api_patch(f"/upload/{file_id}",
-                           json={"filename": new_filename})
+        _, err = api_patch(f"/upload/{file_id}", json={"filename": new_filename})
         if err:
             st.error(f"改名失敗：{err}")
             return
@@ -232,8 +209,7 @@ def move_file_dialog(file_id, filename, project_id, current_folder_id):
 
     folder_options = [{"id": -1, "name": "（根目錄）"}] + (folders or [])
     current_folder_key = current_folder_id if current_folder_id is not None else -1
-    default_idx = next((i for i, f in enumerate(
-        folder_options) if f["id"] == current_folder_key), 0)
+    default_idx = next((i for i, f in enumerate(folder_options) if f["id"] == current_folder_key), 0)
 
     target_folder = st.selectbox(
         "移動到資料夾",
@@ -250,8 +226,7 @@ def move_file_dialog(file_id, filename, project_id, current_folder_id):
         if selected_id == current_folder_key:
             st.info("檔案已在此資料夾。")
             return
-        _, err = api_patch(f"/upload/{file_id}",
-                           json={"folder_id": selected_id})
+        _, err = api_patch(f"/upload/{file_id}", json={"folder_id": selected_id})
         if err:
             st.error(f"移動失敗：{err}")
             return
@@ -261,8 +236,8 @@ def move_file_dialog(file_id, filename, project_id, current_folder_id):
     if c2.button("取消", use_container_width=True, key=f"move_cancel_{file_id}"):
         st.rerun()
 
-# ===== 主頁面邏輯 =====
 
+# ===== 主頁面邏輯 =====
 
 # 1. 如果在根目錄：顯示專案列表
 if st.session_state.nav_project_id is None:
@@ -278,15 +253,12 @@ if st.session_state.nav_project_id is None:
         cols = st.columns(3)
         for i, p in enumerate(projects):
             with cols[i % 3]:
-                # 使用 earth-card 包裹以顯現邊框與陰影
                 st.markdown(f"""
           <div class="earth-card">
             <h3 style="margin-top:0; color:#4a5759;">📂 {p['name']}</h3>
-            <p style="color:#666; font-size:0.9rem; min-height:3em
-                ">{p['description'] or '無描述'}</p>
+            <p style="color:#666; font-size:0.9rem; min-height:3em">{p['description'] or '無描述'}</p>
           </div>
         """, unsafe_allow_html=True)
-                # 按鈕放在卡片下方
                 if st.button(f"進入專案：{p['name']}", key=f"pj_{p['id']}", use_container_width=True):
                     go_to_project(p["id"])
                     st.rerun()
@@ -298,13 +270,9 @@ else:
     page_size = st.session_state.nav_file_page_size
     current_page = max(1, st.session_state.nav_file_page)
 
-    # 取得資料夾
     all_folders, _ = api_get("/folders", params={"project_id": project_id})
-    # 篩選當前目錄下的子資料夾
-    sub_folders = [f for f in (all_folders or [])
-                   if f.get("parent_id") == folder_id]
+    sub_folders = [f for f in (all_folders or []) if f.get("parent_id") == folder_id]
 
-    # 取得當前資料夾檔案（server-side 分頁）
     page_params = {
         "project_id": project_id,
         "folder_id": folder_id if folder_id is not None else -1,
@@ -319,11 +287,7 @@ else:
     current_files = (paged_files or {}).get("items", [])
     current_total = int((paged_files or {}).get("total", 0))
     total_pages = max(1, (current_total + page_size - 1) // page_size)
-    if current_page > total_pages:
-        st.session_state.nav_file_page = total_pages
-        st.rerun()
 
-    # --- 顯示子資料夾 ---
     if sub_folders:
         st.subheader("📂 子資料夾")
         fcols = st.columns(4)
@@ -333,13 +297,11 @@ else:
                     go_to_folder(f["id"])
                     st.rerun()
 
-    # --- 顯示檔案列表 ---
     st.subheader("📄 檔案內容")
     page_top_left, page_top_right = st.columns([2, 3])
     with page_top_left:
         selected_page_size = st.selectbox(
-            "每頁筆數",
-            options=[25, 50, 100],
+            "每頁筆數", options=[25, 50, 100],
             index=[25, 50, 100].index(page_size) if page_size in [25, 50, 100] else 1,
         )
         if selected_page_size != page_size:
@@ -347,14 +309,7 @@ else:
             st.session_state.nav_file_page = 1
             st.rerun()
     with page_top_right:
-        st.markdown(
-            f"""
-            <div style="text-align:right;color:#7a6e6e;font-size:0.92rem;padding-top:1.9rem;">
-              目前第 <b>{current_page}</b> / <b>{total_pages}</b> 頁
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div style="text-align:right;color:#7a6e6e;font-size:0.92rem;padding-top:1.9rem;">目前第 <b>{current_page}</b> / <b>{total_pages}</b> 頁</div>', unsafe_allow_html=True)
 
     page_nav_cols = st.columns([1, 1, 4])
     with page_nav_cols[0]:
@@ -369,7 +324,6 @@ else:
     if not current_files and not sub_folders:
         st.info("此目錄下暫無內容。")
     elif current_files:
-        # 標題
         h_cols = st.columns([0.4, 2.2, 0.8, 1.2, 1.4, 2.8])
         header_texts = ["ID", "檔案名稱", "類型", "狀態", "上傳時間", "操作"]
         for col, text in zip(h_cols, header_texts):
@@ -379,23 +333,13 @@ else:
         for f in current_files:
             r_cols = st.columns([0.4, 2.2, 0.8, 1.2, 1.4, 2.8])
             fid = f["id"]
-
             r_cols[0].write(str(fid))
-            # 檔名維持純文字顯示
             r_cols[1].write(f["filename"])
-
             r_cols[2].write(f"`{f['file_type']}`")
-
-            # 狀態與錯誤訊息
             status = f["status"]
-            badge_html = status_badge(status)
+            r_cols[3].markdown(status_badge(status), unsafe_allow_html=True)
             if status == "failed" and f.get("error_msg"):
-                r_cols[3].markdown(f"{badge_html}", unsafe_allow_html=True)
                 r_cols[3].caption(f"原因: {f['error_msg']}")
-            else:
-                r_cols[3].markdown(badge_html, unsafe_allow_html=True)
-
-            # 時間
             r_cols[4].write(format_tw_datetime(f.get("created_at")))
 
             op_cols = r_cols[5].columns(5, gap="small")
@@ -404,8 +348,7 @@ else:
             if op_cols[1].button("⬇", key=f"download_btn_{fid}", help="下載", use_container_width=True):
                 st.session_state["pending_download_url"] = f"{get_external_api_url()}/upload/{fid}/download?as_attachment=true"
             if op_cols[2].button("⇄", key=f"move_btn_{fid}", help="移動資料夾", use_container_width=True):
-                move_file_dialog(fid, f["filename"],
-                                 project_id, f.get("folder_id"))
+                move_file_dialog(fid, f["filename"], project_id, f.get("folder_id"))
             if op_cols[3].button("✎", key=f"rename_btn_{fid}", help="改名", use_container_width=True):
                 rename_file_dialog(fid, f["filename"])
             if op_cols[4].button("🗑", key=f"del_{fid}", type="secondary", help="刪除", use_container_width=True):
@@ -423,13 +366,6 @@ else:
                         del st.session_state[f"confirm_del_{fid}"]
                         st.rerun()
 
-        pending_download_url = st.session_state.pop("pending_download_url", None)
-        if pending_download_url:
-            components.html(
-                f"""
-                <script>
-                  window.location.href = "{pending_download_url}";
-                </script>
-                """,
-                height=0,
-            )
+    pending_download_url = st.session_state.pop("pending_download_url", None)
+    if pending_download_url:
+        components.html(f"""<script>window.location.href = "{pending_download_url}";</script>""", height=0)
