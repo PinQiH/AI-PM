@@ -462,6 +462,7 @@ def _process_zip_contents(db, zip_record: FileRecord, zip_path: str):
         # 建立目錄路徑到 Folder ID 的映射，用來處理層級結構
         # key: 相對路徑字串, value: Folder ID
         folder_map = {}
+        pending_tasks = []
         
         # 遍歷解壓後的目錄
         for root, dirs, files in os.walk(temp_extract_dir):
@@ -524,10 +525,17 @@ def _process_zip_contents(db, zip_record: FileRecord, zip_path: str):
                 db.add(new_record)
                 db.flush()
                 
-                # 啟動新任務解析此檔案
-                process_document_task.delay(file_record_id=new_record.id, file_path=dest_path)
+                pending_tasks.append({
+                    "file_record_id": new_record.id,
+                    "file_path": dest_path
+                })
         
         db.commit()
+        
+        # 資料庫確保已寫入後，再發送非同步解析任務
+        for task_kwargs in pending_tasks:
+            process_document_task.delay(**task_kwargs)
+            
         print(f"Successfully unpacked ZIP {zip_record.id} and created child records.")
         
     finally:
