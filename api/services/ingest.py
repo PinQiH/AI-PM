@@ -27,7 +27,7 @@ def replace_knowledge_chunks(
     if not extracted_text or not extracted_text.strip():
         raise ValueError("No text extracted from the file.")
 
-    chunks = chunk_text(extracted_text, max_chunk_size=500, overlap=50)
+    chunks = chunk_text(extracted_text, overlap=50)
     if not chunks:
         raise ValueError("No chunks generated from extracted text.")
 

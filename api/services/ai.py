@@ -35,7 +35,7 @@ def _split_long_line(line: str, max_chars: int) -> list[str]:
     return [line[i:i + max_chars] for i in range(0, len(line), max_chars)]
 
 
-def chunk_text(text: str, max_chunk_size=500, overlap=50, max_chars=3000) -> list[str]:
+def chunk_text(text: str, max_chunk_size=300, overlap=50, max_chars=1200) -> list[str]:
     """
     混合使用 word 與 char 切片，避免超長無空白內容超出 embedding 限制。
     """
