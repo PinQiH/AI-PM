@@ -98,6 +98,7 @@ def import_from_nextcloud(req: NextcloudImportRequest, db: Session = Depends(get
     supported_exts = ["pdf", "docx", "doc", "txt", "csv", "xlsx", "xls", "odt", "zip", "rar", "mp3", "m4a", "wav", "webm", "mp4"]
     
     tasks_queued = 0
+    tasks_to_dispatch = []
     
     def _create_record(file_path: str, current_folder_id: Optional[int]):
         filename = os.path.basename(file_path)
@@ -126,12 +127,15 @@ def import_from_nextcloud(req: NextcloudImportRequest, db: Session = Depends(get
         )
         db.add(record)
         db.flush()
-        process_document_task.delay(file_record_id=record.id, file_path=record.file_path)
+        # 避免 Race condition：先存入暫存陣列，等外部 db.commit() 完成後才發送任務
+        tasks_to_dispatch.append({"id": record.id, "file_path": record.file_path})
         return 1
 
     if os.path.isfile(req.path):
         tasks_queued += _create_record(req.path, req.folder_id)
         db.commit()
+        for t in tasks_to_dispatch:
+            process_document_task.delay(file_record_id=t["id"], file_path=t["file_path"])
         return {"status": "success", "imported_files": tasks_queued, "message": "File queued for import"}
         
     elif os.path.isdir(req.path):
@@ -181,6 +185,9 @@ def import_from_nextcloud(req: NextcloudImportRequest, db: Session = Depends(get
                 tasks_queued += _create_record(file_path, parent_id)
                 
         db.commit()
+        for t in tasks_to_dispatch:
+            process_document_task.delay(file_record_id=t["id"], file_path=t["file_path"])
+            
         msg = f"Directory scan complete. {tasks_queued} files queued for import."
         return {"status": "success", "imported_files": tasks_queued, "message": msg}
         
