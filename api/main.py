@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 
-from api.routes import admin, projects, folders, upload, query, outlook
+from api.routes import admin, projects, folders, upload, query, outlook, nextcloud
 
 app = FastAPI(title="ElenB API", description="AI Agent for PM Knowledge Base", version="0.1.0")
 API_PREFIX = "/api"
@@ -32,6 +32,7 @@ app.include_router(folders.router, prefix=API_PREFIX)
 app.include_router(upload.router, prefix=API_PREFIX)
 app.include_router(query.router, prefix=API_PREFIX)
 app.include_router(outlook.router, prefix=API_PREFIX)
+app.include_router(nextcloud.router, prefix=API_PREFIX)
 app.include_router(admin.router, prefix=API_PREFIX)
 
 class HealthCheck(BaseModel):

@@ -55,7 +55,7 @@ with tab_upload:
             )
             folder_id = selected_folder["id"] if selected_folder else None
 
-        up_tab_file, up_tab_record = st.tabs(["拖放上傳檔案", "瀏覽器錄音"])
+        up_tab_file, up_tab_record, up_tab_nextcloud = st.tabs(["拖放上傳檔案", "瀏覽器錄音", "Nextcloud 匯入"])
 
         with up_tab_file:
             st.markdown("""
@@ -280,6 +280,108 @@ with tab_upload:
       """.replace("__PUBLIC_API_BASE_URL__", get_external_api_url()).replace("__PROJECT_ID__", str(project_id or "")).replace("__FOLDER_ID__", str(folder_id or ""))
             components.html(recorder_html, height=520, scrolling=False)
             st.caption(f"注意：瀏覽器錄音會直接呼叫 API（`POST {get_external_api_url()}/upload`）。")
+
+        with up_tab_nextcloud:
+            st.markdown("""
+        <div style="margin-bottom:1rem;">
+          <p style="color:#4a5759;font-size:0.95rem;">
+            從掛載的 Nextcloud 目錄選擇並匯入檔案或資料夾至知識庫。<br>
+            ※ 此功能為唯讀存取，不消耗實體空間也不會刪除原生檔案。
+          </p>
+        </div>
+      """, unsafe_allow_html=True)
+            
+            if "nextcloud_current_path" not in st.session_state:
+                st.session_state["nextcloud_current_path"] = "/nextcloud"
+            if "nc_path_input" not in st.session_state:
+                st.session_state["nc_path_input"] = "/nextcloud"
+                
+            def nc_go_path():
+                st.session_state["nextcloud_current_path"] = st.session_state["nc_path_input"]
+                
+            def nc_go_up():
+                curr = st.session_state["nextcloud_current_path"]
+                if curr.rstrip('/\\') == "/nextcloud":
+                    return
+                parent = os.path.dirname(curr)
+                if parent.startswith("/nextcloud") and len(parent) >= len("/nextcloud"):
+                    st.session_state["nextcloud_current_path"] = parent
+                    st.session_state["nc_path_input"] = parent
+
+            def nc_go_enter(p):
+                st.session_state["nextcloud_current_path"] = p
+                st.session_state["nc_path_input"] = p
+                
+            st.text_input("手動輸入絕對路徑", key="nc_path_input", on_change=nc_go_path)
+            col_go, col_up = st.columns([1, 10])
+            
+            with col_go:
+                st.button("前往", key="nc_btn_go", on_click=nc_go_path)
+            with col_up:
+                st.button("⬆ 回上一層", key="nc_btn_up", on_click=nc_go_up)
+                        
+            current_path = st.session_state["nextcloud_current_path"]
+            nc_data, nc_err = api_get("/nextcloud/list", params={"path": current_path})
+            
+            if nc_err:
+                st.error(f"無法讀取目錄：{nc_err}")
+            else:
+                items = nc_data.get("items", [])
+                st.markdown(f"**目前路徑：** `{nc_data.get('current_path', current_path)}`")
+                if not items:
+                    st.info("此目錄為空。")
+                else:
+                    st.markdown("<hr style='margin: 0.5em 0;'>", unsafe_allow_html=True)
+                    for item in items:
+                        i_col1, i_col2, i_col3 = st.columns([6, 2, 2])
+                        icon = "📁" if item["is_dir"] else "📄"
+                        i_col1.markdown(f"{icon} {item['name']}")
+                        if item["is_dir"]:
+                            i_col2.button("進入", key=f"nc_enter_{item['path']}", on_click=nc_go_enter, args=(item['path'],))
+                            if i_col3.button("匯入資料夾", key=f"nc_import_{item['path']}"):
+                                st.session_state["pending_nc_import"] = item['path']
+                        else:
+                            ext = item['name'].split('.')[-1].lower() if '.' in item['name'] else ''
+                            if ext in ["pdf", "jpg", "jpeg", "png", "txt", "csv", "mp3", "m4a", "mp4", "webm"]:
+                                preview_url = f"{get_api_url()}/nextcloud/download?path={item['path']}"
+                                if i_col2.button("👁 預覽", key=f"nc_preview_{item['path']}"):
+                                    st.session_state["pending_nc_preview"] = preview_url
+                                    st.session_state["pending_nc_preview_name"] = item['name']
+                            if i_col3.button("匯入檔案", key=f"nc_import_{item['path']}"):
+                                st.session_state["pending_nc_import"] = item['path']
+            
+            nc_preview_url = st.session_state.get("pending_nc_preview")
+            if nc_preview_url:
+                st.markdown("---")
+                st.markdown(f"**預覽：** `{st.session_state.get('pending_nc_preview_name')}`")
+                
+                def nc_close_preview():
+                    st.session_state.pop("pending_nc_preview", None)
+                    st.session_state.pop("pending_nc_preview_name", None)
+                    
+                st.button("關閉預覽", on_click=nc_close_preview)
+                st.markdown(f'<iframe src="{nc_preview_url}" width="100%" height="600px" style="border:1px solid #ccc;"></iframe>', unsafe_allow_html=True)
+
+            nc_import_path = st.session_state.get("pending_nc_import")
+            if nc_import_path:
+                st.markdown("---")
+                st.info(f"準備匯入：`{nc_import_path}` 至專案「{selected_proj['name']}」")
+                if st.button("確定執行匯入", type="primary"):
+                    payload = {
+                        "project_id": project_id,
+                        "folder_id": folder_id,
+                        "path": nc_import_path
+                    }
+                    resp, err = api_post("/nextcloud/import", json=payload)
+                    if err:
+                        st.error(f"匯入失敗：{err}")
+                    else:
+                        st.success(f"{resp.get('message', '已排入隊列')}")
+                        st.session_state.pop("pending_nc_import", None)
+                        
+                def nc_cancel_import():
+                    st.session_state.pop("pending_nc_import", None)
+                st.button("取消匯入", on_click=nc_cancel_import)
 
 with tab_manage:
     col_form, col_list = st.columns([1, 1], gap="large")

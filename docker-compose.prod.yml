@@ -32,6 +32,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - uploads_data:/app/uploads
+      - /nextcloud:/nextcloud:ro
     depends_on:
       - db
       - redis
@@ -51,6 +52,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - uploads_data:/app/uploads
+      - /nextcloud:/nextcloud:ro
     depends_on:
       - db
       - redis
@@ -74,6 +76,7 @@ services:
       - PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL}
     volumes:
       - uploads_data:/app/uploads
+      - /nextcloud:/nextcloud:ro
     depends_on:
       - db
     restart: unless-stopped
@@ -89,6 +92,8 @@ services:
       - WEB_ADMIN_PASSWORD=${WEB_ADMIN_PASSWORD}
     ports:
       - "127.0.0.1:8501:8501"
+    volumes:
+      - /nextcloud:/nextcloud:ro
     depends_on:
       - api
     restart: unless-stopped

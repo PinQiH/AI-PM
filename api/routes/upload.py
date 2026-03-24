@@ -49,13 +49,14 @@ def _delete_file_record_tree(record: FileRecord, db: Session):
       db.flush()
   
   if record.file_path and os.path.exists(record.file_path):
-    # 檢查是否還有其他 FileRecord 正在使用此實體路徑
-    other_usage = db.execute(select(FileRecord).where(
-      FileRecord.file_path == record.file_path,
-      FileRecord.id != record.id
-    )).first()
-    if not other_usage:
-      os.remove(record.file_path)
+    if record.source_type != "nextcloud":
+      # 檢查是否還有其他 FileRecord 正在使用此實體路徑
+      other_usage = db.execute(select(FileRecord).where(
+        FileRecord.file_path == record.file_path,
+        FileRecord.id != record.id
+      )).first()
+      if not other_usage:
+        os.remove(record.file_path)
   db.delete(record)
 
 @router.post("", response_model=FileRecordResponse)

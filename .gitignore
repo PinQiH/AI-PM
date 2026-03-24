@@ -33,6 +33,7 @@ Thumbs.db
 # Runtime / generated project data
 uploads/
 temp/
+test_nextcloud/
 
 # Logs
 *.log

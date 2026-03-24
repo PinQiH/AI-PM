@@ -65,7 +65,26 @@ def extract_text_from_file(file_path: str, file_type: str) -> Optional[str]:
             from docx import Document
 
             doc = Document(file_path)
-            text = "\n".join([para.text for para in doc.paragraphs])
+            text_blocks = []
+            
+            # 1. 抓取所有段落文字
+            for para in doc.paragraphs:
+                cleaned = para.text.strip()
+                if cleaned:
+                    text_blocks.append(cleaned)
+                    
+            # 2. 抓取所有表格文字 (許多履歷與排版文件會使用表格)
+            for table in doc.tables:
+                for row in table.rows:
+                    row_data = []
+                    for cell in row.cells:
+                        cleaned_cell = cell.text.strip().replace('\n', ' ')
+                        if cleaned_cell:
+                            row_data.append(cleaned_cell)
+                    if row_data:
+                        text_blocks.append(" | ".join(row_data))
+                        
+            text = "\n".join(text_blocks)
             return text.strip()
 
         elif file_type in ["xlsx", "xls", "csv"]:
