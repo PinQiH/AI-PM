@@ -65,7 +65,7 @@ CORS_ALLOWED_ORIGINS=...
 開發環境建議：
 
 ```env
-PUBLIC_API_BASE_URL=http://localhost:8000/api
+PUBLIC_API_BASE_URL=http://localhost:8000
 CORS_ALLOWED_ORIGINS=http://localhost:8501,http://127.0.0.1:8501
 ```
 
@@ -132,11 +132,11 @@ docker compose -f docker-compose.prod.yml exec api alembic upgrade head
 服務入口：
 
 - 開發 Web: `http://localhost:8501`
-- 開發 API: `http://localhost:8000/api`
+- 開發 API: `http://localhost:8000`
 - 開發 PostgreSQL: `localhost:5434`
 - 開發 Redis: `localhost:6379`
 - 正式 Web 對外網址：`https://elenb.gogotest.xyz`
-- 正式 API 對外網址：`https://elenb.gogotest.xyz/api`
+- 正式 API 對外網址：`https://elenb.gogotest.xyz`
 - 正式主機本機 PostgreSQL: `127.0.0.1:5434`
 - 正式 Redis: 僅 Docker 內網，不對外開放
 
@@ -175,13 +175,13 @@ docker compose logs -f worker
 下載系統備份：
 
 ```bash
-curl -OJ http://localhost:8000/api/admin/backup
+curl -OJ http://localhost:8000/admin/backup
 ```
 
 正式環境若從主機本機操作，可改用：
 
 ```bash
-curl -OJ http://127.0.0.1:8000/api/admin/backup
+curl -OJ http://127.0.0.1:8000/admin/backup
 ```
 
 備份壓縮檔內容包含：
@@ -253,20 +253,20 @@ docker compose -f docker-compose.prod.yml up -d --force-recreate web
 正式環境預期由 Nginx 代理：
 
 - `https://elenb.gogotest.xyz/` -> `http://127.0.0.1:8501`
-- `https://elenb.gogotest.xyz/api/` -> `http://127.0.0.1:8000/api/`
+- `https://elenb.gogotest.xyz/upload/` -> `http://127.0.0.1:8000/upload/` (範例)
 
 請確認：
 
-- `/api/upload` 可接受大檔案上傳
-- `/api/upload/<id>/download` 可正常下載檔案
+- `/upload` 可接受大檔案上傳
+- `/upload/<id>/download` 可正常下載檔案
 - 瀏覽器錄音上傳與下載都會走 `PUBLIC_API_BASE_URL`
-- Nginx 不需要移除 `/api` 前綴，直接原樣轉發
+- **注意**：後端 API 已移除 `/api` 前綴，Nginx 轉發時請確認路徑匹配。
 - API 不直接暴露公網 port
 
 建議先確認 `.env` 至少是這兩個正式值：
 
 ```env
-PUBLIC_API_BASE_URL=https://elenb.gogotest.xyz/api
+PUBLIC_API_BASE_URL=https://elenb.gogotest.xyz
 CORS_ALLOWED_ORIGINS=https://elenb.gogotest.xyz
 ```
 
@@ -286,14 +286,12 @@ CORS_ALLOWED_ORIGINS=https://elenb.gogotest.xyz
 - `uploads/`、`temp/` 為執行時產物，已列入 `.gitignore`
 - `.streamlit/config.toml` 與 `.agents/rules/` 目前保留在版控中
 
-## 專案限制
 
-目前專案建立規則：
+## 專案限制與大檔切片
 
-- 專案名稱最長 15 字
-- 專案描述最長 30 字
+目前專案建立與檔案處理規則：
 
-此限制已同時加在：
-
-- 前端表單
-- 後端 API 驗證
+- 專案名稱最長 15 字，專案描述最長 30 字（前後端連動驗證）。
+- **知識切片限制**：為避免 OpenAI Token 超限 (8192 ctx)，單個文字片段上限為 **1200 字元** 與 **300 個單詞**。
+- 若檔案（如 PDF、CSV）內容過長或缺少換行，系統會自動在安全字數處強制切分。
+- 此切片邏輯適用於所有匯入管道：直接上傳、Nextcloud 匯入、Outlook (PST/CSV) 同步。
