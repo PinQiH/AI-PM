@@ -116,7 +116,7 @@ def _build_sources_messages(sources: list) -> list[str]:
 
     sorted_sources = sorted(
         dedup.values(), key=lambda x: x.similarity, reverse=True)
-    base_url = settings.PUBLIC_API_BASE_URL.rstrip("/")
+    base_url = settings.PUBLIC_API_URL.rstrip("/")
 
     source_lines = []
     for idx, src in enumerate(sorted_sources, start=1):

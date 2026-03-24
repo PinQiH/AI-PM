@@ -265,8 +265,12 @@ with tab_upload:
             formData.append('file', window._recordingBlob, baseName + '.webm');
             formData.append('project_id', PROJECT_ID);
             if (FOLDER_ID) formData.append('folder_id', FOLDER_ID);
+            
+            const cleanBase = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+            const targetUrl = cleanBase.endsWith('/api') ? (cleanBase + '/upload') : (cleanBase + '/api/upload');
+            
             try {
-              const resp = await fetch(API_URL + '/upload', { method: 'POST', body: formData });
+              const resp = await fetch(targetUrl, { method: 'POST', body: formData });
               const data = await resp.json();
               if (!resp.ok) throw new Error((data && data.detail) ? data.detail : resp.statusText);
               successMsg.textContent = '上傳成功，檔案 ID: ' + data.id;
