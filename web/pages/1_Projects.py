@@ -505,7 +505,7 @@ with tab_manage:
 
             st.divider()
 
-            with st.form("delete_folder_form"):
+            with st.container():
                 folder_project = st.selectbox(
                     "資料夾所屬專案",
                     options=projects_for_delete,
@@ -524,7 +524,7 @@ with tab_manage:
                         format_func=lambda f: f"{f['name']}  (ID: {f['id']})",
                     )
                     confirm_folder = st.checkbox("我確認要刪除此資料夾與其底下所有內容")
-                    del_folder_submit = st.form_submit_button(
+                    del_folder_submit = st.button(
                         "刪除資料夾", type="secondary")
                     if del_folder_submit:
                         if not confirm_folder:
@@ -538,7 +538,7 @@ with tab_manage:
                                 st.rerun()
                 else:
                     st.info("此專案目前沒有可刪除的資料夾。")
-                    st.form_submit_button("刪除資料夾", disabled=True)
+                    st.button("刪除資料夾", disabled=True)
 
     with col_list:
         st.subheader("所有專案")
