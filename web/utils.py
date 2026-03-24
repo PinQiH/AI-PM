@@ -8,23 +8,18 @@ import requests
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-INTERNAL_API_URL = os.getenv("API_URL", "http://api:8000/api")
-PUBLIC_API_BASE_URL = os.getenv("PUBLIC_API_BASE_URL", "http://localhost:8000/api")
+INTERNAL_API_URL = os.getenv("API_URL", "http://api:8000")
+PUBLIC_API_BASE_URL = os.getenv("PUBLIC_API_BASE_URL", "http://localhost:8000")
 TAIWAN_TZ = ZoneInfo("Asia/Taipei")
 WEB_ADMIN_PASSWORD = os.getenv("WEB_ADMIN_PASSWORD", "")
 
 def get_api_url():
   """供 Streamlit Server 呼叫 API (容器內網)"""
-  url = INTERNAL_API_URL.rstrip("/")
-  if not url.endswith("/api"):
-    url += "/api"
-  return url
+  return INTERNAL_API_URL.rstrip("/")
 
 def get_external_api_url() -> str:
     """取得外部可存取的 API URL (用於產生下載/預覽連結)"""
-    url = os.getenv("PUBLIC_API_BASE_URL", "http://localhost:8000/api").rstrip("/")
-    if not url.endswith("/api"):
-        url = f"{url}/api"
+    url = os.getenv("PUBLIC_API_BASE_URL", "http://localhost:8000").rstrip("/")
     return url
 
 

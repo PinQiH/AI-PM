@@ -6,7 +6,7 @@ import os
 from api.routes import admin, projects, folders, upload, query, outlook, nextcloud
 
 app = FastAPI(title="ElenB API", description="AI Agent for PM Knowledge Base", version="0.1.0")
-API_PREFIX = "/api"
+API_PREFIX = ""
 
 
 def _get_allowed_origins() -> list[str]:

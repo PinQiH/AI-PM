@@ -267,7 +267,7 @@ with tab_upload:
             if (FOLDER_ID) formData.append('folder_id', FOLDER_ID);
             
             const cleanBase = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
-            const targetUrl = cleanBase.endsWith('/api') ? (cleanBase + '/upload') : (cleanBase + '/api/upload');
+            const targetUrl = cleanBase + '/upload';
             
             try {
               const resp = await fetch(targetUrl, { method: 'POST', body: formData });

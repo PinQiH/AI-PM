@@ -25,15 +25,12 @@ class Settings(BaseSettings):
     TELEGRAM_DEFAULT_PROJECT_ID: str = os.getenv(
         "TELEGRAM_DEFAULT_PROJECT_ID", "")
     PUBLIC_API_BASE_URL: str = os.getenv(
-        "PUBLIC_API_BASE_URL", "http://localhost:8000/api")
+        "PUBLIC_API_BASE_URL", "http://localhost:8000")
     
     @property
     def PUBLIC_API_URL(self) -> str:
-        """取得外部可存取的完整 API 基礎 URL (包含 /api)"""
-        url = self.PUBLIC_API_BASE_URL.rstrip("/")
-        if not url.endswith("/api"):
-            url += "/api"
-        return url
+        """取得外部可存取的完整 API 基礎 URL (不含末尾斜槓)"""
+        return self.PUBLIC_API_BASE_URL.rstrip("/")
 
     TELEGRAM_IDLE_TIMEOUT_MINUTES: str = os.getenv(
         "TELEGRAM_IDLE_TIMEOUT_MINUTES", "30")
