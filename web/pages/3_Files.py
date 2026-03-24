@@ -102,14 +102,8 @@ def show_preview(file_id, filename, file_type):
 
     try:
         if f_type == "pdf":
-            import base64
-            resp = requests.get(f"{get_api_url()}/upload/{file_id}/download", timeout=30)
-            if resp.status_code == 200:
-                base64_pdf = base64.b64encode(resp.content).decode("utf-8")
-                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800px" style="border:none;"></iframe>'
-                st.markdown(pdf_display, unsafe_allow_html=True)
-            else:
-                st.error("無法讀取 PDF 內容。")
+            pdf_display = f'<iframe src="{dl_url}" width="100%" height="800px" style="border:none;"></iframe>'
+            st.markdown(pdf_display, unsafe_allow_html=True)
 
         elif f_type == "docx":
             resp = requests.get(f"{get_api_url()}/upload/{file_id}/download?preview=true", timeout=30)
@@ -359,22 +353,22 @@ else:
             r_cols[4].write(format_tw_datetime(f.get("created_at")))
 
             op_cols = r_cols[5].columns(6, gap="small")
-            if op_cols[0].button("👁", key=f"preview_btn_{fid}", help="預覽", use_container_width=True):
-                show_preview(fid, f["filename"], f.get("file_type"))
-            if op_cols[1].button("⬇", key=f"download_btn_{fid}", help="下載", use_container_width=True):
-                st.session_state["pending_download_url"] = f"{get_external_api_url()}/upload/{fid}/download?as_attachment=true"
-            if op_cols[2].button("⇄", key=f"move_btn_{fid}", help="移動資料夾", use_container_width=True):
-                move_file_dialog(fid, f["filename"], project_id, f.get("folder_id"))
-            if op_cols[3].button("✎", key=f"rename_btn_{fid}", help="改名", use_container_width=True):
-                rename_file_dialog(fid, f["filename"])
             if status == "failed":
-                if op_cols[4].button("🔄", key=f"retry_btn_{fid}", type="primary", help="重新處理", use_container_width=True):
+                if op_cols[0].button("↻", key=f"retry_btn_{fid}", type="primary", help="重新處理", use_container_width=True):
                     _, err = api_patch(f"/upload/{fid}/retry")
                     if err:
                         st.error(f"重試失敗: {err}")
                     else:
                         st.success("已重新加入處理佇列。")
                         st.rerun()
+            if op_cols[1].button("👁", key=f"preview_btn_{fid}", help="預覽", use_container_width=True):
+                show_preview(fid, f["filename"], f.get("file_type"))
+            if op_cols[2].button("⬇", key=f"download_btn_{fid}", help="下載", use_container_width=True):
+                st.session_state["pending_download_url"] = f"{get_external_api_url()}/upload/{fid}/download?as_attachment=true"
+            if op_cols[3].button("⇄", key=f"move_btn_{fid}", help="移動資料夾", use_container_width=True):
+                move_file_dialog(fid, f["filename"], project_id, f.get("folder_id"))
+            if op_cols[4].button("✎", key=f"rename_btn_{fid}", help="改名", use_container_width=True):
+                rename_file_dialog(fid, f["filename"])
             if op_cols[5].button("🗑", key=f"del_{fid}", type="secondary", help="刪除", use_container_width=True):
                 st.session_state[f"confirm_del_{fid}"] = True
 

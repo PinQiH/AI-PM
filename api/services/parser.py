@@ -61,7 +61,7 @@ def extract_text_from_file(file_path: str, file_type: str) -> Optional[str]:
                     text += page_text + "\n"
             return text.strip()
 
-        elif file_type == "docx" or file_type == "doc":
+        elif file_type == "docx":
             from docx import Document
 
             doc = Document(file_path)
@@ -86,6 +86,17 @@ def extract_text_from_file(file_path: str, file_type: str) -> Optional[str]:
                         
             text = "\n".join(text_blocks)
             return text.strip()
+
+        elif file_type == "doc":
+            import subprocess
+            # 使用系統安裝的 antiword 解析 legacy .doc (二進制格式)
+            try:
+                result = subprocess.run(['antiword', file_path], capture_output=True, text=True, check=True)
+                return result.stdout.strip()
+            except FileNotFoundError:
+                raise RuntimeError("System dependency 'antiword' is not installed. Failed to parse legacy .doc file.")
+            except subprocess.CalledProcessError as e:
+                raise RuntimeError(f"antiword execution failed. Output: {e.stderr}")
 
         elif file_type in ["xlsx", "xls", "csv"]:
             import pandas as pd

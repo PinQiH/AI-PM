@@ -20,12 +20,12 @@ def get_api_url():
     url += "/api"
   return url
 
-def get_external_api_url():
-  """供 Browser 呼叫 API (外部存取)。"""
-  url = PUBLIC_API_BASE_URL.rstrip("/")
-  if not url.endswith("/api"):
-    url += "/api"
-  return url
+def get_external_api_url() -> str:
+    """取得外部可存取的 API URL (用於產生下載/預覽連結)"""
+    base_url = os.getenv("PUBLIC_API_BASE_URL", "http://localhost:8000/api").rstrip("/")
+    if not base_url.endswith("/api"):
+        base_url = f"{base_url}/api"
+    return base_url
 
 
 def require_admin_auth():
