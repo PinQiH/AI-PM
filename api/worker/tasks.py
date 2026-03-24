@@ -60,7 +60,7 @@ def _delete_file_record(db, record: Optional[FileRecord]):
         _delete_file_record(db, child)
     
     if record.file_path and os.path.exists(record.file_path):
-        if record.source_type != "nextcloud":
+        if record.source_type != "nextcloud" and "nextcloud" not in str(record.file_path).lower():
             # 檢查是否還有其他 FileRecord 正在使用此實體路徑
             other_usage = db.execute(
                 select(FileRecord).where(
@@ -69,7 +69,10 @@ def _delete_file_record(db, record: Optional[FileRecord]):
                 )
             ).first()
             if not other_usage:
-                os.remove(record.file_path)
+                try:
+                    os.remove(record.file_path)
+                except OSError as e:
+                    print(f"Warning: Failed to delete physical file {record.file_path}: {e}")
     
     db.delete(record)
 
@@ -374,8 +377,11 @@ def process_document_task(self, file_record_id: int, file_path: str, metadata: d
       file_record.error_msg = f"Duplicate content (same MD5 as file {existing_record.id}). Knowledge chunks reused."
       
       # 刪除新產生的冗餘實體檔案以節省空間
-      if os.path.exists(file_path) and file_record.source_type != "nextcloud":
-        os.remove(file_path)
+      if os.path.exists(file_path) and file_record.source_type != "nextcloud" and "nextcloud" not in str(file_path).lower():
+        try:
+          os.remove(file_path)
+        except OSError as e:
+          print(f"Warning: Failed to delete duplicate file {file_path}: {e}")
       
       db.commit()
       return {"status": "duplicate_redirected", "reused_from": existing_record.id}
@@ -389,8 +395,11 @@ def process_document_task(self, file_record_id: int, file_path: str, metadata: d
       print(f"ZIP file detected. Processing contents for ID={file_record_id}")
       _process_zip_contents(db, file_record, file_path)
       # 依據使用者要求：處理完畢後刪除原本的 .zip 檔與紀錄
-      if os.path.exists(file_path) and file_record.source_type != "nextcloud":
-        os.remove(file_path)
+      if os.path.exists(file_path) and file_record.source_type != "nextcloud" and "nextcloud" not in str(file_path).lower():
+        try:
+          os.remove(file_path)
+        except OSError as e:
+          print(f"Warning: Failed to delete zip file {file_path}: {e}")
       db.delete(file_record)
       db.commit()
       return {"status": "zip_processed_and_deleted"}
@@ -399,8 +408,11 @@ def process_document_task(self, file_record_id: int, file_path: str, metadata: d
       print(f"RAR file detected. Processing contents for ID={file_record_id}")
       _process_rar_contents(db, file_record, file_path)
       # 處理完畢後刪除原本的 .rar 檔與紀錄
-      if os.path.exists(file_path) and file_record.source_type != "nextcloud":
-        os.remove(file_path)
+      if os.path.exists(file_path) and file_record.source_type != "nextcloud" and "nextcloud" not in str(file_path).lower():
+        try:
+          os.remove(file_path)
+        except OSError as e:
+          print(f"Warning: Failed to delete rar file {file_path}: {e}")
       db.delete(file_record)
       db.commit()
       return {"status": "rar_processed_and_deleted"}

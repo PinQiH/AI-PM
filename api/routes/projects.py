@@ -46,8 +46,11 @@ def list_projects(db: Session = Depends(get_db)):
 def _delete_file_record(record: FileRecord, db: Session):
     """刪除檔案資料列與磁碟實體檔案"""
     if record.file_path and os.path.exists(record.file_path):
-        if record.source_type != "nextcloud":
-            os.remove(record.file_path)
+        if record.source_type != "nextcloud" and "nextcloud" not in str(record.file_path).lower():
+            try:
+                os.remove(record.file_path)
+            except OSError as e:
+                print(f"Warning: Failed to delete physical file {record.file_path}: {e}")
     db.delete(record)
 
 

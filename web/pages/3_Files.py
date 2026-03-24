@@ -102,19 +102,35 @@ def show_preview(file_id, filename, file_type):
 
     try:
         if f_type == "pdf":
-            pdf_display = f'<iframe src="{dl_url}" width="100%" height="800px" style="border:none;"></iframe>'
-            st.markdown(pdf_display, unsafe_allow_html=True)
+            import base64
+            resp = requests.get(f"{get_api_url()}/upload/{file_id}/download", timeout=30)
+            if resp.status_code == 200:
+                base64_pdf = base64.b64encode(resp.content).decode("utf-8")
+                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800px" style="border:none;"></iframe>'
+                st.markdown(pdf_display, unsafe_allow_html=True)
+            else:
+                st.error("無法讀取 PDF 內容。")
 
         elif f_type == "docx":
-            word_url = f"{dl_url}?preview=true"
-            word_display = f'<iframe src="{word_url}" width="100%" height="800px" style="border:none; background:white;"></iframe>'
-            st.markdown(word_display, unsafe_allow_html=True)
+            resp = requests.get(f"{get_api_url()}/upload/{file_id}/download?preview=true", timeout=30)
+            if resp.status_code == 200:
+                components.html(resp.text, height=800, scrolling=True)
+            else:
+                st.error("無法讀取 Word 內容進行預覽。")
 
         elif f_type in ["png", "jpg", "jpeg", "gif", "webp"]:
-            st.image(dl_url, use_column_width=True)
+            resp = requests.get(f"{get_api_url()}/upload/{file_id}/download", timeout=30)
+            if resp.status_code == 200:
+                st.image(resp.content, use_column_width=True)
+            else:
+                st.error("無法讀取圖片內容。")
 
         elif f_type in ["mp3", "m4a", "wav", "webm"]:
-            st.audio(dl_url)
+            resp = requests.get(f"{get_api_url()}/upload/{file_id}/download", timeout=30)
+            if resp.status_code == 200:
+                st.audio(resp.content)
+            else:
+                st.error("無法讀取音檔內容。")
 
         elif f_type in ["txt", "csv", "log", "odt"]:
             preview_url = f"{get_api_url()}/upload/{file_id}/download"
@@ -342,7 +358,7 @@ else:
                 r_cols[3].caption(f"原因: {f['error_msg']}")
             r_cols[4].write(format_tw_datetime(f.get("created_at")))
 
-            op_cols = r_cols[5].columns(5, gap="small")
+            op_cols = r_cols[5].columns(6, gap="small")
             if op_cols[0].button("👁", key=f"preview_btn_{fid}", help="預覽", use_container_width=True):
                 show_preview(fid, f["filename"], f.get("file_type"))
             if op_cols[1].button("⬇", key=f"download_btn_{fid}", help="下載", use_container_width=True):
@@ -351,7 +367,15 @@ else:
                 move_file_dialog(fid, f["filename"], project_id, f.get("folder_id"))
             if op_cols[3].button("✎", key=f"rename_btn_{fid}", help="改名", use_container_width=True):
                 rename_file_dialog(fid, f["filename"])
-            if op_cols[4].button("🗑", key=f"del_{fid}", type="secondary", help="刪除", use_container_width=True):
+            if status == "failed":
+                if op_cols[4].button("🔄", key=f"retry_btn_{fid}", type="primary", help="重新處理", use_container_width=True):
+                    _, err = api_patch(f"/upload/{fid}/retry")
+                    if err:
+                        st.error(f"重試失敗: {err}")
+                    else:
+                        st.success("已重新加入處理佇列。")
+                        st.rerun()
+            if op_cols[5].button("🗑", key=f"del_{fid}", type="secondary", help="刪除", use_container_width=True):
                 st.session_state[f"confirm_del_{fid}"] = True
 
             if st.session_state.get(f"confirm_del_{fid}"):

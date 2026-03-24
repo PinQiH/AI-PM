@@ -49,14 +49,17 @@ def _delete_file_record_tree(record: FileRecord, db: Session):
       db.flush()
   
   if record.file_path and os.path.exists(record.file_path):
-    if record.source_type != "nextcloud":
+    if record.source_type != "nextcloud" and "nextcloud" not in str(record.file_path).lower():
       # 檢查是否還有其他 FileRecord 正在使用此實體路徑
       other_usage = db.execute(select(FileRecord).where(
         FileRecord.file_path == record.file_path,
         FileRecord.id != record.id
       )).first()
       if not other_usage:
-        os.remove(record.file_path)
+        try:
+          os.remove(record.file_path)
+        except OSError as e:
+          print(f"Warning: Failed to delete physical file {record.file_path}: {e}")
   db.delete(record)
 
 @router.post("", response_model=FileRecordResponse)
@@ -216,6 +219,26 @@ def update_file(
   db.commit()
   db.refresh(record)
   return record
+
+@router.patch("/{file_id}/retry", response_model=FileRecordResponse)
+def retry_failed_file(file_id: int, db: Session = Depends(get_db)):
+    """重新處理失敗的檔案"""
+    stmt = select(FileRecord).where(FileRecord.id == file_id)
+    record = db.execute(stmt).scalar_one_or_none()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    if record.status != "failed":
+        raise HTTPException(status_code=400, detail="Only failed files can be retried")
+        
+    record.status = "pending"
+    record.error_msg = None
+    db.commit()
+    db.refresh(record)
+    
+    process_document_task.delay(file_record_id=record.id, file_path=record.file_path)
+    return record
 
 @router.get("/{file_id}/preview")
 def get_file_preview(file_id: int, db: Session = Depends(get_db)):

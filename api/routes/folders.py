@@ -79,8 +79,11 @@ def delete_folder(folder_id: int, db: Session = Depends(get_db)):
     files = db.execute(select(FileRecord).where(FileRecord.folder_id.in_(to_delete_ids))).scalars().all()
     for file_obj in files:
         if file_obj.file_path and os.path.exists(file_obj.file_path):
-            if file_obj.source_type != "nextcloud":
-                os.remove(file_obj.file_path)
+            if file_obj.source_type != "nextcloud" and "nextcloud" not in str(file_obj.file_path).lower():
+                try:
+                    os.remove(file_obj.file_path)
+                except OSError as e:
+                    print(f"Warning: Failed to delete physical file {file_obj.file_path}: {e}")
         db.delete(file_obj)
 
     # 再刪資料夾（深度優先：子 -> 父）
