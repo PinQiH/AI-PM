@@ -1,14 +1,21 @@
-"""
-Outlook 管理頁：PST 匯入與全域歸檔規則
-"""
-from utils import inject_css, page_header, api_get, api_post, api_delete, get_api_url, format_tw_datetime, require_admin_auth
 import os
 import sys
-
 import requests
 import streamlit as st
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+# 將父目錄加入路徑，以便匯入 utils
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils import (
+  inject_css, 
+  page_header, 
+  api_get, 
+  api_post, 
+  api_delete, 
+  get_api_url, 
+  format_tw_datetime, 
+  require_admin_auth
+)
 
 
 st.set_page_config(page_title="ElenB - Outlook", page_icon="📬", layout="wide")

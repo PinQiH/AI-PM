@@ -1,12 +1,21 @@
-"""
-Upload 主頁：檔案上傳 + 錄音上傳 + 專案設定
-"""
-from utils import inject_css, page_header, api_get, api_post, api_delete, require_admin_auth, get_external_api_url, get_api_url
-import streamlit.components.v1 as components
-import streamlit as st
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+import streamlit as st
+import streamlit.components.v1 as components
+
+# 將父目錄加入路徑，以便匯入 utils
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils import (
+  inject_css, 
+  page_header, 
+  api_get, 
+  api_post, 
+  api_delete, 
+  require_admin_auth, 
+  get_external_api_url, 
+  get_api_url
+)
 
 
 st.set_page_config(page_title="ElenB - Projects", page_icon="📁", layout="wide")

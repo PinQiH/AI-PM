@@ -1,16 +1,26 @@
-"""
-檔案總覽頁面：層級式導覽 (專案 -> 資料夾 -> 檔案)
-"""
-from utils import inject_css, page_header, status_badge, api_get, api_delete, api_patch, get_external_api_url, get_api_url, format_tw_datetime, require_admin_auth
+import sys
+import os
 import requests
 import pandas as pd
 import io
 import streamlit as st
 import streamlit.components.v1 as components
-import sys
-import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+# 將父目錄加入路徑，以便匯入 utils
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils import (
+  inject_css, 
+  page_header, 
+  status_badge, 
+  api_get, 
+  api_delete, 
+  api_patch, 
+  get_external_api_url, 
+  get_api_url, 
+  format_tw_datetime, 
+  require_admin_auth
+)
 
 st.set_page_config(page_title="ElenB - 檔案總覽", page_icon="📁", layout="wide")
 inject_css()
