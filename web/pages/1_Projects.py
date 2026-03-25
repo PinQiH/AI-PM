@@ -356,7 +356,8 @@ with tab_upload:
                         else:
                             ext = item['name'].split('.')[-1].lower() if '.' in item['name'] else ''
                             if ext in ["pdf", "jpg", "jpeg", "png", "txt", "csv", "mp3", "m4a", "mp4", "webm"]:
-                                preview_url = f"{get_api_url()}/nextcloud/download?path={item['path']}"
+                                # 使用外部可存取的 URL 進行預覽
+                                preview_url = f"{get_external_api_url()}/nextcloud/download?path={item['path']}"
                                 if i_col2.button("👁 預覽", key=f"nc_preview_{item['path']}"):
                                     st.session_state["pending_nc_preview"] = preview_url
                                     st.session_state["pending_nc_preview_name"] = item['name']
