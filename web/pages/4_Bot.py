@@ -9,13 +9,14 @@ import io
 import pandas as pd
 import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from utils import inject_css, page_header, api_get, api_post, get_external_api_url, get_api_url, require_admin_auth
+from utils import inject_css, page_header, api_get, api_post, get_external_api_url, get_api_url, require_admin_auth, show_security_warning
 
 
 st.set_page_config(page_title="ElenB - Demo Bot", page_icon="🤖", layout="wide")
 inject_css()
 require_admin_auth()
 page_header("🤖", "Demo Bot", "從知識庫中搜尋答案 — 請先選擇專案再開始提問")
+show_security_warning()
 
 GREETING = "你好，我是 ElenB，你的虛擬 PM。"
 NO_ANSWER_TEXT = "我目前無法從既有資料中找到答案。"

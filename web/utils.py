@@ -63,6 +63,22 @@ def require_admin_auth():
   st.stop()
 
 
+@st.cache_data(ttl=600)
+def get_system_config():
+  """取得後端系統配置並快取 10 分鐘"""
+  data, err = api_get("/config")
+  if err:
+    return {"use_local_llm": False}
+  return data
+
+
+def show_security_warning():
+  """若為雲端模式，顯示安全性提醒"""
+  config = get_system_config()
+  if not config.get("use_local_llm"):
+    st.warning("⚠️ 此系統目前使用網際網路雲端模型處理內容，請勿上傳機密文件、帳號密碼、金鑰或其他敏感資料。", icon="🔐")
+
+
 def format_tw_datetime(value, fmt: str = "%Y/%m/%d %H:%M") -> str:
   """將 ISO datetime 或 datetime 物件轉為台灣時區字串。"""
   if not value:

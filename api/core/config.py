@@ -19,6 +19,19 @@ class Settings(BaseSettings):
     # OpenAI 設定
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
+    # 地端 LLM 設定 (例如 Ollama)
+    USE_LOCAL_LLM: bool = os.getenv("USE_LOCAL_LLM", "False").lower() == "true"
+    LOCAL_LLM_URL: str = os.getenv(
+        "LOCAL_LLM_URL", "http://192.168.12.111:11434/api/chat")
+    LOCAL_LLM_MODEL: str = os.getenv("LOCAL_LLM_MODEL", "qwen3-coder-next")
+    LOCAL_LLM_EMBEDDING_URL: str = os.getenv(
+        "LOCAL_LLM_EMBEDDING_URL", "http://192.168.12.111:11434/api/embeddings")
+    LOCAL_LLM_EMBEDDING_MODEL: str = os.getenv(
+        "LOCAL_LLM_EMBEDDING_MODEL", "nomic-embed-text")
+    LOCAL_WHISPER_URL: str = os.getenv(
+        "LOCAL_WHISPER_URL", "http://192.168.12.111:8001/transcribe")
+
+
     # Telegram 設定
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_WEBHOOK_SECRET: str = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")

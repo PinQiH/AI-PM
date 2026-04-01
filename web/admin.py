@@ -205,7 +205,7 @@ if telegram_bot_url:
         <h2 class="tg-hero__title">{title}</h2>
         <p class="tg-hero__desc">
           讓外部使用者不用登入後台，也能直接從 Telegram 問答、取得專案知識內容。
-          這個入口比較適合展示給客戶、同事或臨時需要查資料的人。
+          這個入口比較適合展示給同事或臨時需要查資料的人。
         </p>
         <div class="tg-hero__meta">t.me/{telegram_bot_username}</div>
       </div>

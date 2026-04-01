@@ -1,29 +1,110 @@
+import httpx
 from openai import OpenAI
 from api.core.config import settings
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-def transcribe_audio(file_path: str) -> str:
+def chat_completion(messages: list[dict[str, str]], model: str = "gpt-4o") -> str:
+    // - AI 對談 (Chat Completion)
     """
-    使用 OpenAI Whisper API 轉錄音檔成文字
+    根據設定，切換使用 OpenAI 或地端協定 (/api/chat) 進行對談
     """
-    with open(file_path, "rb") as audio_file:
-        transcription = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file
+    if settings.USE_LOCAL_LLM:
+        # 使用地端 LLM 協定 (依照使用者需求: curl http://.../api/chat)
+        # 注意: 使用者指定的 URL 已經是 http://...:11434/api/chat
+        payload = {
+            "model": settings.LOCAL_LLM_MODEL,
+            "messages": messages,
+            "stream": False
+        }
+        try:
+            response = httpx.post(
+                settings.LOCAL_LLM_URL,
+                json=payload,
+                timeout=120.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            # 依照 Ollama /api/chat 標準回傳格式: data["message"]["content"]
+            # 若使用者環境之格式稍有不同，可能需在此調整
+            return data.get("message", {}).get("content", "")
+        except Exception as e:
+            # TODO: 更好的錯誤處理
+            return f"地端 LLM 呼叫失敗: {str(e)}"
+    else:
+        # 使用標準 OpenAI
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages
         )
-    return transcription.text
+        return response.choices[0].message.content
+
+def transcribe_audio(file_path: str) -> str:
+    // - 語音轉文字 (Whisper)
+    """
+    使用 OpenAI Whisper 或地端 Whisper API 轉錄音檔成文字
+    """
+    if settings.USE_LOCAL_LLM:
+        # 使用地端 Whisper 協定 (依照使用者需求: curl -X POST ... -F "file=@..." -F "language=zh")
+        try:
+            with open(file_path, "rb") as f:
+                files = {"file": (os.path.basename(file_path), f)}
+                data = {"language": "zh"}
+                response = httpx.post(
+                    settings.LOCAL_WHISPER_URL,
+                    files=files,
+                    data=data,
+                    timeout=300.0  # 語音辨識較耗時，設定較長 timeout
+                )
+                response.raise_for_status()
+                # 假設回傳格式為 {"text": "..."}
+                return response.json().get("text", "")
+        except Exception as e:
+            print(f"地端 Whisper 呼叫失敗: {str(e)}")
+            raise e
+    else:
+        # 使用標準 OpenAI
+        with open(file_path, "rb") as audio_file:
+            transcription = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file
+            )
+        return transcription.text
 
 def get_embedding(text: str, model="text-embedding-3-small") -> list[float]:
+    // - 取得向量表示 (Embedding)
     """
-    取得 OpenAI 向量表示 (維度=1536)
+    取得向量表示。根據設定自動切換 OpenAI (1536維) 或地端 (維度視模型而定)。
     """
-    text = text.replace("\n", " ") # 根據 OpenAI 建議: 替換掉換行字元通常可以獲得更好的 embedding
-    response = client.embeddings.create(
-        input=[text],
-        model=model
-    )
-    return response.data[0].embedding
+    text = text.replace("\n", " ")  # 根據 OpenAI 建議: 替換掉換行字元通常可以獲得更好的 embedding
+
+    if settings.USE_LOCAL_LLM:
+        # 使用地端 Embedding 協定 (依照使用者需求: curl http://.../api/embeddings)
+        payload = {
+            "model": settings.LOCAL_LLM_EMBEDDING_MODEL,
+            "prompt": text
+        }
+        try:
+            response = httpx.post(
+                settings.LOCAL_LLM_EMBEDDING_URL,
+                json=payload,
+                timeout=60.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            # 依照 Ollama /api/embeddings 標準回傳格式: data["embedding"]
+            return data.get("embedding", [])
+        except Exception as e:
+            # TODO: 更好的錯誤處理
+            print(f"地端 Embedding 呼叫失敗: {str(e)}")
+            raise e
+    else:
+        # 使用標準 OpenAI
+        response = client.embeddings.create(
+            input=[text],
+            model=model
+        )
+        return response.data[0].embedding
 
 def _normalize_text_for_chunking(text: str) -> str:
     return (text or "").replace("\r\n", "\n").replace("\r", "\n")

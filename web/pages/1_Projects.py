@@ -14,7 +14,8 @@ from utils import (
   api_delete, 
   require_admin_auth, 
   get_external_api_url, 
-  get_api_url
+  get_api_url,
+  show_security_warning
 )
 
 
@@ -30,7 +31,7 @@ tab_upload, tab_manage = st.tabs(["上傳檔案", "專案設定"])
 
 with tab_upload:
     st.subheader("選擇上傳目標")
-    st.warning("此系統使用雲端模型處理內容，請勿上傳機密文件、帳號密碼、金鑰或其他敏感資料。")
+    show_security_warning()
     projects, perr = api_get("/projects")
     if perr:
         st.error(perr)

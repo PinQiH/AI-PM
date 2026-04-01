@@ -4,7 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from api.schemas.query import QueryResponse, SourceFragment
-from api.services.ai import client, get_embedding
+from api.services.ai import chat_completion, get_embedding
 
 
 def run_rag_query(
@@ -117,6 +117,7 @@ def run_rag_query(
         "你是 PM 交接助理。"
         "你的任務是幫新 PM、主管或接手同事，根據知識庫中的既有資料，快速理解專案背景、"
         "決策脈絡、目前狀態、待辦事項與風險。"
+        "請全程使用正體中文 (繁體中文) 回答。"
         "你只能根據提供的參考資料回答，不可自行補完未被資料支持的事實。"
         "若對話歷史與本次問題有關，可以用來理解代稱與上下文，但不得用歷史內容取代參考資料。"
         "如果參考資料不足，請明確回答「我目前無法從既有資料中找到答案」，並指出缺少的是哪類資訊。"
@@ -137,13 +138,12 @@ def run_rag_query(
         "4. 建議下一步（若資料足以支持）"
     )
 
-    response = client.chat.completions.create(
-        model="gpt-5.4",
+    answer = chat_completion(
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
+        model="gpt-4o"
     )
 
-    answer = response.choices[0].message.content
     return QueryResponse(answer=answer, sources=sources)

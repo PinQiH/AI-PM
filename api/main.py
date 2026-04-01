@@ -44,3 +44,15 @@ def health_check():
     檢查 API 服務是否正常運作
     """
     return HealthCheck(status="OK")
+
+
+@app.get(f"{API_PREFIX}/config", tags=["System"])
+def get_config():
+    """
+    取得系統配置資訊 (例如是否使用地端 LLM)
+    """
+    from api.core.config import settings
+    return {
+        "use_local_llm": settings.USE_LOCAL_LLM,
+        "project_name": settings.PROJECT_NAME
+    }
