@@ -39,7 +39,6 @@ def chat_completion(messages: list[dict[str, str]], model: str = "gpt-4o") -> st
         return response.choices[0].message.content
 
 def transcribe_audio(file_path: str) -> str:
-    // - 語音轉文字 (Whisper)
     """
     使用 OpenAI Whisper 或地端 Whisper API 轉錄音檔成文字
     """
@@ -71,7 +70,6 @@ def transcribe_audio(file_path: str) -> str:
         return transcription.text
 
 def get_embedding(text: str, model="text-embedding-3-small") -> list[float]:
-    // - 取得向量表示 (Embedding)
     """
     取得向量表示。根據設定自動切換 OpenAI (1536維) 或地端 (維度視模型而定)。
     """
