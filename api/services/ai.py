@@ -5,7 +5,6 @@ from api.core.config import settings
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 def chat_completion(messages: list[dict[str, str]], model: str = "gpt-4o") -> str:
-    // - AI 對談 (Chat Completion)
     """
     根據設定，切換使用 OpenAI 或地端協定 (/api/chat) 進行對談
     """
