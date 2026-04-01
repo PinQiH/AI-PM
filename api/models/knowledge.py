@@ -17,7 +17,9 @@ class KnowledgeBase(Base, TimestampMixin):
     sender: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     conversation_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    # 預設儲存 OpenAI 產生的 1536 維度向量
-    embedding = mapped_column(Vector(1536))
+    
+    # 根據是否使用地端模型自動切換維度 (OpenAI=1536, Local=依設定)
+    from api.core.config import settings
+    embedding = mapped_column(Vector(settings.LOCAL_LLM_EMBEDDING_DIM if settings.USE_LOCAL_LLM else 1536))
     
     source_file = relationship("FileRecord", back_populates="knowledge_fragments")

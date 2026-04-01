@@ -28,6 +28,7 @@ class Settings(BaseSettings):
         "LOCAL_LLM_EMBEDDING_URL", "http://192.168.12.111:11434/api/embeddings")
     LOCAL_LLM_EMBEDDING_MODEL: str = os.getenv(
         "LOCAL_LLM_EMBEDDING_MODEL", "nomic-embed-text")
+    LOCAL_LLM_EMBEDDING_DIM: int = 768
     LOCAL_WHISPER_URL: str = os.getenv(
         "LOCAL_WHISPER_URL", "http://192.168.12.111:8001/transcribe")
 
